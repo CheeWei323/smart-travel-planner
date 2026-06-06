@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const testRoutes = require('./routes/testRoutes');
+const tripRoutes = require("./routes/tripRoutes");
 
 
 connectDB();
@@ -19,6 +20,7 @@ app.use(helmet());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
+app.use("/api/trips", tripRoutes);
 
 app.get("/", (req, res) => {
     res.json({
