@@ -10,6 +10,11 @@ import {
 export default function TripsPage() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredTrips = trips.filter((trip) =>
+    trip.destination.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const navigate = useNavigate();
 
@@ -72,28 +77,37 @@ export default function TripsPage() {
       {/* SEARCH */}
       <div style={{
         display: "flex",
+        alignItems: "center",
         gap: "10px",
-        background: "#f1f5f9",
-        padding: "10px",
-        borderRadius: "10px",
-        width: "350px"
+        background: "#ffffff",
+        padding: "12px 16px",
+        borderRadius: "12px",
+        width: "350px",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
       }}>
-        <FaSearch color="gray" />
-        <input placeholder="Search trips..." style={{
+        <FaSearch color="#6b7280" />
+        <input 
+        placeholder="Search trips..." 
+        value = {searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        style={{
           border: "none",
           outline: "none",
           width: "100%",
-          background: "transparent"
+          background: "transparent",
+          fontSize: "14px",
+          color: "#111827"
         }} />
       </div>
 
       {/* LIST */}
       {loading ? (
         <p>Loading...</p>
-      ) : trips.length === 0 ? (
+      ) : filteredTrips.length === 0 ? (
         <p>No trips found</p>
       ) : (
-        trips.map((trip) => (
+        filteredTrips.map((trip) => (
           <TripCard
             key={trip._id}
             trip={trip}

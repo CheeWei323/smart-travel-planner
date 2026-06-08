@@ -1,9 +1,12 @@
 import { FaSearch, FaBell } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { getTrips } from "../services/tripService";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardPage() {
   const user = JSON.parse(localStorage.getItem("user"));
+
+  const navigate = useNavigate();
 
   const [trips, setTrips] = useState([]);
 
@@ -54,19 +57,24 @@ export default function DashboardPage() {
         <h2>Smart Travel Planner</h2>
 
         <div style={{
-          display: "flex",
-          gap: "10px",
-          background: "#f1f5f9",
-          padding: "10px",
-          borderRadius: "10px",
-          width: "350px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            backgroundColor: "#ffffff",
+            padding: "12px 16px",
+            borderRadius: "12px",
+            width: "350px",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
         }}>
           <FaSearch color="gray" />
-          <input placeholder="Search trips..." style={{
+          <input placeholder="Search destinations..." style={{
             border: "none",
             outline: "none",
             width: "100%",
             background: "transparent",
+            fontSize: "14px",
+            color: "#111827"
           }} />
         </div>
 
@@ -74,7 +82,9 @@ export default function DashboardPage() {
           <FaBell size={18} />
           <img
             src="https://i.pravatar.cc/40"
-            style={{ width: 40, height: 40, borderRadius: "50%" }}
+            alt= "Profile"
+            onClick={() => navigate("/profile")}
+            style={{ width: 40, height: 40, borderRadius: "50%", cursor: "pointer", border: "2px solid #2563eb" }}
           />
         </div>
       </div>
