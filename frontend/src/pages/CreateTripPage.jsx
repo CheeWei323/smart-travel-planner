@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createTrip, updateTrip, getTrips } from "../services/tripService";
 
+// +++++ ADD THIS IMPORT +++++
+import Weather from "../components/Weather";
+
 export default function TripFormPage() {
   const [formData, setFormData] = useState({
     destination: "",
@@ -22,11 +25,10 @@ export default function TripFormPage() {
   const isView = window.location.pathname.includes("view");
   const isCreate = !id;
 
-  const isReadOnly = isView; //  VIEW MODE LOCK
+  const isReadOnly = isView;
 
   useEffect(() => {
     if (!id) {
-      // RESET FORM WHEN CREATING NEW TRIP
       setFormData({
         destination: "",
         startDate: "",
@@ -40,15 +42,13 @@ export default function TripFormPage() {
       });
       return;
     }
-
     loadTrip();
   }, [id]);
 
-    const loadTrip = async () => {
+  const loadTrip = async () => {
     try {
       const data = await getTrips();
       const trip = data.find((t) => t._id === id);
-
       if (trip) {
         setFormData({
           destination: trip.destination || "",
@@ -56,7 +56,6 @@ export default function TripFormPage() {
           endDate: trip.endDate ? trip.endDate.substring(0, 10) : "",
           budget: trip.budget || "",
           notes: trip.notes || "",
-
           hotel: !!trip.hotel,
           flight: !!trip.flight,
           carRental: !!trip.carRental,
@@ -70,9 +69,7 @@ export default function TripFormPage() {
 
   const handleChange = (e) => {
     if (isReadOnly) return;
-
     const { name, value, type, checked } = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? Boolean(checked) : value,
@@ -88,7 +85,6 @@ export default function TripFormPage() {
         carRental: !!formData.carRental,
         activities: !!formData.activities,
       };
-
       if (isEdit) {
         await updateTrip(id, payload);
         alert("Trip Updated!");
@@ -96,7 +92,6 @@ export default function TripFormPage() {
         await createTrip(payload);
         alert("Trip Created!");
       }
-
       navigate("/trips");
     } catch (err) {
       console.error(err);
@@ -112,7 +107,6 @@ export default function TripFormPage() {
         <h2 style={{ margin: 0 }}>
           {isView ? "View Trip" : isEdit ? "Edit Trip" : "Create Trip"}
         </h2>
-
         <p style={{ margin: 0, color: "gray" }}>
           {isView
             ? "You are viewing this trip (read-only)"
@@ -142,7 +136,6 @@ export default function TripFormPage() {
             style={inputStyle}
             disabled={isReadOnly}
           />
-
           <input
             type="date"
             name="endDate"
@@ -153,6 +146,14 @@ export default function TripFormPage() {
           />
         </div>
       </div>
+
+      {/* +++++ WEATHER SECTION (ONLY WHEN VIEWING) +++++ */}
+      {isView && formData.destination && (
+        <div style={sectionStyle}>
+          <h3 style={titleStyle}>Current Weather</h3>
+          <Weather city={formData.destination} />
+        </div>
+      )}
 
       {/* LOGISTICS */}
       <div style={sectionStyle}>
@@ -178,7 +179,6 @@ export default function TripFormPage() {
             onChange={handleChange}
             disabled={isReadOnly}
           />
-
           <CheckBox
             label="Flight"
             name="flight"
@@ -186,7 +186,6 @@ export default function TripFormPage() {
             onChange={handleChange}
             disabled={isReadOnly}
           />
-
           <CheckBox
             label="Car Rental"
             name="carRental"
@@ -194,7 +193,6 @@ export default function TripFormPage() {
             onChange={handleChange}
             disabled={isReadOnly}
           />
-
           <CheckBox
             label="Activities"
             name="activities"
@@ -208,7 +206,6 @@ export default function TripFormPage() {
       {/* NOTES */}
       <div style={sectionStyle}>
         <h3 style={titleStyle}>Additional Details</h3>
-
         <textarea
           name="notes"
           value={formData.notes}
@@ -229,7 +226,7 @@ export default function TripFormPage() {
   );
 }
 
-/* STYLES */
+/* STYLES remain unchanged */
 const sectionStyle = {
   background: "white",
   padding: "15px",
@@ -258,7 +255,6 @@ const buttonStyle = {
   cursor: "pointer",
 };
 
-/* CHECKBOX */
 function CheckBox({ label, name, checked, onChange, disabled }) {
   return (
     <label style={{ display: "flex", gap: "6px", alignItems: "center" }}>

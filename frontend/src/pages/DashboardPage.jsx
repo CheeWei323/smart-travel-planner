@@ -2,13 +2,15 @@ import { FaSearch, FaBell } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { getTrips } from "../services/tripService";
 import { useNavigate } from "react-router-dom";
+import { getImageForDestination } from "../services/pexelsService";
 
 export default function DashboardPage() {
   const user = JSON.parse(localStorage.getItem("user"));
-
   const navigate = useNavigate();
-
   const [trips, setTrips] = useState([]);
+  const [nextTripImage, setNextTripImage] = useState("");
+  const [loadingImage, setLoadingImage] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     loadTrips();
@@ -23,31 +25,52 @@ export default function DashboardPage() {
     }
   };
 
-  // 🔥 STATS
+  // STATS
   const totalTrips = trips.length;
-
   const upcomingTrips = trips.filter(
     (t) => new Date(t.startDate) > new Date()
   ).length;
-
   const totalBudget = trips.reduce(
     (sum, t) => sum + (Number(t.budget) || 0),
     0
   );
 
-  // 🔥 NEXT TRIP
+  // NEXT TRIP
   const nextTrip = [...trips]
     .filter((t) => new Date(t.startDate) >= new Date())
     .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
 
-  // 🔥 RECENT
+  // Fetch image for the next trip's destination
+  useEffect(() => {
+    const fetchNextTripImage = async () => {
+      if (nextTrip?.destination) {
+        setLoadingImage(true);
+        setImageError(false);
+        try {
+          const imageUrl = await getImageForDestination(nextTrip.destination);
+          setNextTripImage(imageUrl);
+        } catch (err) {
+          setImageError(true);
+          setNextTripImage("");
+        } finally {
+          setLoadingImage(false);
+        }
+      } else {
+        setNextTripImage("");
+        setLoadingImage(false);
+        setImageError(false);
+      }
+    };
+    fetchNextTripImage();
+  }, [nextTrip]);
+
+  // RECENT
   const recentTrips = [...trips]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 2);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
       {/* HEADER */}
       <div style={{
         display: "flex",
@@ -55,36 +78,12 @@ export default function DashboardPage() {
         justifyContent: "space-between",
       }}>
         <h2>Smart Travel Planner</h2>
-
-        <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            backgroundColor: "#ffffff",
-            padding: "12px 16px",
-            borderRadius: "12px",
-            width: "350px",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
-        }}>
-          <FaSearch color="gray" />
-          <input placeholder="Search destinations..." style={{
-            border: "none",
-            outline: "none",
-            width: "100%",
-            background: "transparent",
-            fontSize: "14px",
-            color: "#111827"
-          }} />
-        </div>
-
         <div style={{ display: "flex", gap: "15px" }}>
-          <FaBell size={18} />
           <img
             src="https://i.pravatar.cc/40"
-            alt= "Profile"
+            alt="Profile"
             onClick={() => navigate("/profile")}
-            style={{ width: 40, height: 40, borderRadius: "50%", cursor: "pointer", border: "2px solid #2563eb" }}
+            style={{ width: 45, height: 45, borderRadius: "50%", cursor: "pointer", border: "2px solid #2563eb" }}
           />
         </div>
       </div>
@@ -97,11 +96,11 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* STATS */}
+      {/* STATS CARDS */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "15px",
+        gap: "20px",
       }}>
         <StatCard title="Total Trips" value={totalTrips} />
         <StatCard title="Upcoming" value={upcomingTrips} />
@@ -111,7 +110,7 @@ export default function DashboardPage() {
       {/* BUDGET */}
       <div style={{
         padding: "20px",
-        background: "#0f172a",
+        background: "#002429",
         color: "white",
         borderRadius: "12px",
       }}>
@@ -119,26 +118,51 @@ export default function DashboardPage() {
         <h1>RM {totalBudget}</h1>
       </div>
 
-      {/* BOTTOM */}
+      {/* BOTTOM SECTION */}
       <div style={{ display: "flex", gap: "20px" }}>
-
-        {/* LEFT */}
+        {/* LEFT – Next Adventure (NO preset image) */}
         <div style={{ flex: 2 }}>
-
           <h3>Next Adventure</h3>
-
           {nextTrip ? (
             <div style={{
               position: "relative",
               height: "320px",
               borderRadius: "16px",
               overflow: "hidden",
+              background: "#e5e7eb"
             }}>
-              <img
-                src="https://images.unsplash.com/photo-1503899036084-c55cdd92da26"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-
+              {loadingImage ? (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  background: "#f3f4f6",
+                  fontSize: "14px",
+                  color: "#6b7280"
+                }}>
+                  Loading travel photo...
+                </div>
+              ) : imageError ? (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  background: "#f3f4f6",
+                  fontSize: "14px",
+                  color: "#dc2626"
+                }}>
+                  ❌ Could not load image
+                </div>
+              ) : (
+                <img
+                  src={nextTripImage}
+                  alt={nextTrip.destination}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              )}
+              {/* Overlay (always visible) */}
               <div style={{
                 position: "absolute",
                 bottom: 0,
@@ -160,17 +184,16 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT – Recent Activity */}
         <div style={{ flex: 1 }}>
-
           <h3>Recent Activity</h3>
-
           {recentTrips.map((t) => (
             <div key={t._id} style={{
               background: "white",
               padding: "12px",
               borderRadius: "12px",
               marginBottom: "10px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             }}>
               <p style={{ fontWeight: "bold" }}>{t.destination}</p>
               <p style={{ fontSize: "12px", color: "gray" }}>
@@ -178,23 +201,25 @@ export default function DashboardPage() {
               </p>
             </div>
           ))}
-
         </div>
       </div>
     </div>
   );
 }
 
-/* CARD */
+/* StatCard Component */
 function StatCard({ title, value }) {
   return (
     <div style={{
-      padding: "15px",
-      background: "white",
-      borderRadius: "10px",
+      padding: "20px",
+      background: "#BFF8F8",
+      borderRadius: "16px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+      border: "1px solid #e9eef3",
+      textAlign: "left",
     }}>
-      <p style={{ color: "gray" }}>{title}</p>
-      <h2>{value}</h2>
+      <p style={{ color: "#000000", fontSize: "14px", fontWeight: "500", marginBottom: "8px" }}>{title}</p>
+      <h2 style={{ margin: 0, fontSize: "32px", fontWeight: "bold", color: "#000000" }}>{value}</h2>
     </div>
   );
 }

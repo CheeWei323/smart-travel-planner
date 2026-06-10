@@ -6,6 +6,7 @@ import {
   getTrips,
   deleteTrip,
 } from "../services/tripService";
+import { getImageForDestination } from "../services/pexelsService"; // 🖼️ Pexels image service
 
 export default function TripsPage() {
   const [trips, setTrips] = useState([]);
@@ -25,10 +26,8 @@ export default function TripsPage() {
   const loadTrips = async () => {
     try {
       setLoading(true);
-
       const data = await getTrips();
       setTrips(data?.trips || data || []);
-
     } catch (error) {
       console.error(error);
     } finally {
@@ -39,7 +38,6 @@ export default function TripsPage() {
   const handleDelete = async (id) => {
     const ok = window.confirm("Delete this trip?");
     if (!ok) return;
-
     try {
       await deleteTrip(id);
       setTrips((prev) => prev.filter((t) => t._id !== id));
@@ -50,7 +48,6 @@ export default function TripsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
       {/* HEADER */}
       <div style={{
         display: "flex",
@@ -58,7 +55,6 @@ export default function TripsPage() {
         alignItems: "center"
       }}>
         <h2>My Trips</h2>
-
         <button
           onClick={() => navigate("/create-trip")}
           style={{
@@ -88,20 +84,21 @@ export default function TripsPage() {
       }}>
         <FaSearch color="#6b7280" />
         <input 
-        placeholder="Search trips..." 
-        value = {searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        style={{
-          border: "none",
-          outline: "none",
-          width: "100%",
-          background: "transparent",
-          fontSize: "14px",
-          color: "#111827"
-        }} />
+          placeholder="Search trips..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            border: "none",
+            outline: "none",
+            width: "100%",
+            background: "transparent",
+            fontSize: "14px",
+            color: "#111827"
+          }}
+        />
       </div>
 
-      {/* LIST */}
+      {/* TRIP LIST */}
       {loading ? (
         <p>Loading...</p>
       ) : filteredTrips.length === 0 ? (
@@ -121,13 +118,22 @@ export default function TripsPage() {
   );
 }
 
-function TripCard({ trip, onEdit, onDelete, onView }) {
+// ---------- TripCard Component (with Pexels dynamic image) ----------
+function TripCard({ trip, onDelete, onEdit, onView }) {
+  const [imageUrl, setImageUrl] = useState("");
+
+  useEffect(() => {
+    const loadImage = async () => {
+      const url = await getImageForDestination(trip.destination);
+      setImageUrl(url);
+    };
+    loadImage();
+  }, [trip.destination]);
 
   const getStatus = () => {
     const today = new Date();
     const start = new Date(trip.startDate);
     const end = new Date(trip.endDate);
-
     if (start > today) return "Upcoming";
     if (start <= today && end >= today) return "Active";
     if (end < today) return "Completed";
@@ -135,7 +141,6 @@ function TripCard({ trip, onEdit, onDelete, onView }) {
   };
 
   const status = getStatus();
-
   const statusColor = {
     Upcoming: "#3b82f6",
     Active: "#22c55e",
@@ -150,15 +155,16 @@ function TripCard({ trip, onEdit, onDelete, onView }) {
       overflow: "hidden",
       boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
     }}>
-
-      {/* IMAGE */}
-      <div style={{ position: "relative", height: "180px" }}>
-        <img
-          src="https://images.unsplash.com/photo-1506929562872-bb421503ef21"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-
-        {/* ✅ STATUS TOP LEFT BADGE */}
+      {/* IMAGE SECTION */}
+      <div style={{ position: "relative", height: "180px", background: "#e5e7eb" }}>
+        {imageUrl && (
+          <img
+            src={imageUrl}
+            alt={trip.destination}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        )}
+        {/* Status badge */}
         <span
           style={{
             position: "absolute",
@@ -170,11 +176,12 @@ function TripCard({ trip, onEdit, onDelete, onView }) {
             padding: "4px 8px",
             borderRadius: "6px",
             fontWeight: "bold",
+            zIndex: 2,
           }}
         >
           {status}
         </span>
-
+        {/* Destination overlay */}
         <div style={{
           position: "absolute",
           bottom: 0,
@@ -182,23 +189,21 @@ function TripCard({ trip, onEdit, onDelete, onView }) {
           right: 0,
           padding: "12px",
           color: "white",
-          background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)"
+          background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+          zIndex: 2,
         }}>
           <h3>{trip.destination}</h3>
         </div>
       </div>
 
-      {/* INFO */}
+      {/* INFO SECTION */}
       <div style={{ padding: "15px" }}>
         <p>
           {trip.startDate ? new Date(trip.startDate).toLocaleDateString() : "-"}
           {" → "}
           {trip.endDate ? new Date(trip.endDate).toLocaleDateString() : "-"}
         </p>
-
         <p>RM {trip.budget}</p>
-
-        {/* ACTIONS */}
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span onClick={onView} style={{ color: "green", cursor: "pointer" }}>👁 View</span>
           <span onClick={onEdit} style={{ color: "blue", cursor: "pointer" }}>✏ Edit</span>

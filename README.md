@@ -111,3 +111,5 @@ The following are the primary API endpoints available.
 -   `GET /api/test/protected`
     -   An example of a protected route. Requires a valid JWT to be included in the request header.
     -   **Authorization Header:** `Bearer <YOUR_JWT_TOKEN>`
+
+    bla

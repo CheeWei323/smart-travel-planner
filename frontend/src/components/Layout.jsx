@@ -82,25 +82,6 @@ export default function Layout() {
             <FaMap /> Itinerary
           </NavLink>
 
-          <NavLink
-            to="/settings"
-            style={({ isActive }) => ({
-              ...linkStyle,
-              background: isActive ? "#1e293b" : "transparent",
-            })}
-          >
-            <FaCog /> Settings
-          </NavLink>
-
-          <NavLink
-            to="/support"
-            style={({ isActive }) => ({
-              ...linkStyle,
-              background: isActive ? "#1e293b" : "transparent",
-            })}
-          >
-            <FaQuestionCircle /> Support
-          </NavLink>
         </nav>
       </div>
 
