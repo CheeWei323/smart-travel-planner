@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "axios": "^1.17.0",
+<<<<<<< Updated upstream
+=======
+    "leaflet": "^1.9.4",
+    "mongodb": "^7.3.0",
+>>>>>>> Stashed changes
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.16.0"
