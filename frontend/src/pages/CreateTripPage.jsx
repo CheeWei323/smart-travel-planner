@@ -8,7 +8,7 @@ import Weather from "../components/Weather";
 import { FaTrash, FaPlus, FaCheckSquare, FaRegSquare, FaSearch } from "react-icons/fa";
 
 export default function TripFormPage() {
-  // 🔥 Catch the passed destination data from the TripsPage
+  // Catch the passed destination data from the TripsPage
   const location = useLocation();
   const prefilledDestination = location.state?.destination || "";
 

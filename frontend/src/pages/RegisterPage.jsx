@@ -105,7 +105,7 @@ const pageStyle = {
   animation: "gradient 15s ease infinite",
 };
 
-// 🔥 FIX: Injecting body margin reset alongside the animation
+//  Injecting body margin reset alongside the animation
 const styleSheet = document.createElement("style");
 styleSheet.innerText = `
   html, body {

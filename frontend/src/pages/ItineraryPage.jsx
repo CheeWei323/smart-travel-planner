@@ -305,7 +305,7 @@ export default function ItineraryPage() {
 
               {/* Day Hotel Info */}
               <div style={{ background: "#0f172a", color: "white", padding: "15px", borderRadius: "12px" }}>
-                <h4 style={{ margin: "0 0 5px 0", display: "flex", alignItems: "center", gap: "8px" }}><FaHotel /> Day {activeDay} Base Camp</h4>
+                <h4 style={{ margin: "0 0 5px 0", display: "flex", alignItems: "center", gap: "8px" }}><FaHotel /> Day {activeDay} Hotel</h4>
                 {currentHotel ? <p style={{ margin: 0 }}>{currentHotel.name}</p> : <p style={{ margin: 0, color: "gray" }}>No hotel selected for this day.</p>}
               </div>
 

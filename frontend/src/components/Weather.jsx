@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getWeatherByCity } from '../services/weatherService';
 import { FaMapMarkerAlt, FaWind, FaTint } from "react-icons/fa";
 
-// 🔥 NEW: Function to pick a gradient based on the weather condition
+// Function to pick a gradient based on the weather condition
 const getBackgroundGradient = (weatherMain) => {
   switch (weatherMain) {
     case 'Clear':
@@ -26,20 +26,44 @@ export default function Weather({ city }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+useEffect(() => {
     if (!city) return;
+
     const fetchWeather = async () => {
       setLoading(true);
+      setError('');
+
+      // Step 1: Grab just the first part (e.g., "Penang Island, Malaysia" -> "Penang Island")
+      const baseQuery = city.split(',')[0].trim();
+
       try {
-        const data = await getWeatherByCity(city);
+        // Try searching exactly what Photon gave us
+        const data = await getWeatherByCity(baseQuery);
         setWeather(data);
-        setError('');
-      } catch (err) {
-        setError('Could not fetch weather for this location.');
+      } catch (err1) {
+        console.log(`Failed to fetch weather for "${baseQuery}". Trying smart fallback...`);
+
+        //  The Smart Fallback
+        // Remove words that confuse OpenWeatherMap and try again
+        const fallbackQuery = baseQuery.replace(/\b(Island|City|Prefecture|State|Wilayah)\b/gi, '').trim();
+
+        if (fallbackQuery !== baseQuery && fallbackQuery.length > 0) {
+          try {
+            const fallbackData = await getWeatherByCity(fallbackQuery);
+            setWeather(fallbackData);
+          } catch (err2) {
+            // Both attempts failed
+            setError('Could not fetch weather for this location.');
+          }
+        } else {
+          // Both attempts failed, and there were no words to strip out
+          setError('Could not fetch weather for this location.');
+        }
       } finally {
         setLoading(false);
       }
     };
+
     fetchWeather();
   }, [city]);
 
