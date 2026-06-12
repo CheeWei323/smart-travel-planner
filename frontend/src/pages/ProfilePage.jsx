@@ -57,6 +57,10 @@ const handleUpdateEmail = async () => {
 
 const handleUpdatePassword = async () => {
   try {
+    if (currentPassword === newPassword) {
+      alert("New password cannot be the same as current password");
+      return;
+    }
 
     const token = localStorage.getItem("token");
 

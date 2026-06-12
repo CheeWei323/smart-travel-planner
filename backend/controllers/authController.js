@@ -105,25 +105,28 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    //Update Email
-    if (email) {
-      user.email = email;
-    }
+//Update Password
+if (currentPassword && newPassword) {
 
-    //Update Password
-    if (currentPassword && newPassword) {
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
+  // Prevent same password
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      message: "New password cannot be the same as current password",
+    });
+  }
 
-      if (!isMatch) {
-        return res.status(400).json({
-          message: "Current password is incorrect",
-        });
-      }
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
 
-      const salt = await bcrypt.genSalt(10);
+  if (!isMatch) {
+    return res.status(400).json({
+      message: "Current password is incorrect",
+    });
+  }
 
-      user.password = await bcrypt.hash(newPassword, salt); 
-    }
+  const salt = await bcrypt.genSalt(10);
+
+  user.password = await bcrypt.hash(newPassword, salt);
+}
 
     await user.save();
 
