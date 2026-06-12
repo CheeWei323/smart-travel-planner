@@ -1,16 +1,25 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   FaHome,
   FaSuitcase,
   FaMap,
-  FaCog,
-  FaQuestionCircle,
   FaPlus,
+  FaSignOutAlt,
 } from "react-icons/fa";
 
 export default function Layout() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Clear auth data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    // Redirect to login page
+    navigate("/");
+  };
+
   return (
-    <div style={{ display: "flex", height: "1000vh" }}>
+    <div style={{ display: "flex", height: "100vh" }}>
       
       {/* Sidebar */}
       <div
@@ -24,7 +33,15 @@ export default function Layout() {
         }}
       >
         {/* Logo */}
-        <h2 style={{ fontSize: "22px", marginBottom: "20px" }}>
+        <h2 
+          onClick={() => navigate("/dashboard")}
+          style={{ 
+            fontSize: "22px", 
+            marginBottom: "20px", 
+            cursor: "pointer", 
+            userSelect: "none" 
+          }}
+        >
           TravelWise
         </h2>
 
@@ -83,10 +100,31 @@ export default function Layout() {
           </NavLink>
 
         </nav>
+
+        {/* Logout Button pushed to the bottom */}
+        <div style={{ marginTop: "auto" }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              ...linkStyle,
+              width: "100%",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "#ef4444", // Red color to indicate a destructive/exit action
+              fontSize: "15px",
+              fontFamily: "inherit",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          >
+            <FaSignOutAlt /> Logout
+          </button>
+        </div>
       </div>
 
       {/* Page Content */}
-      <div style={{ flex: 1, padding: "20px" }}>
+      <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
         <Outlet />
       </div>
     </div>

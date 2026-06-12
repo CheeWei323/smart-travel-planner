@@ -8,6 +8,8 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const testRoutes = require('./routes/testRoutes');
 const tripRoutes = require("./routes/tripRoutes");
+const checklistRoutes = require("./routes/checklistRoutes");
+const favoriteRoutes = require("./routes/favoriteRoutes");
 
 
 connectDB();
@@ -21,6 +23,8 @@ app.use(helmet());
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
 app.use("/api/trips", tripRoutes);
+app.use("/api/checklists", checklistRoutes);
+app.use("/api/favorites", favoriteRoutes);
 
 app.get("/", (req, res) => {
     res.json({
