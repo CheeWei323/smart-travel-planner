@@ -7,7 +7,13 @@ const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const testRoutes = require('./routes/testRoutes');
+<<<<<<< Updated upstream
 
+=======
+const tripRoutes = require("./routes/tripRoutes");
+const checklistRoutes = require("./routes/checklistRoutes");
+const favoriteRoutes = require("./routes/favoriteRoutes");
+>>>>>>> Stashed changes
 
 connectDB();
 
@@ -19,6 +25,12 @@ app.use(helmet());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
+<<<<<<< Updated upstream
+=======
+app.use("/api/trips", tripRoutes);
+app.use("/api/checklists", checklistRoutes);
+app.use("/api/favorites", favoriteRoutes);
+>>>>>>> Stashed changes
 
 app.get("/", (req, res) => {
     res.json({
