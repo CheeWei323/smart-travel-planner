@@ -105,6 +105,11 @@ const updateProfile = async (req, res) => {
       });
     }
 
+// Update Email
+    if (email) {
+      user.email = email;
+    }
+
 //Update Password
 if (currentPassword && newPassword) {
 
