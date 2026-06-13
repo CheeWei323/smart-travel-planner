@@ -154,6 +154,7 @@ export default function ItineraryPage() {
     setSearchResults([]);
   };
 
+  // Now uses Photon API so the dropdown pops out instantly!
   const handleSearch = async (e) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -164,23 +165,16 @@ export default function ItineraryPage() {
     }
 
     try {
-      const res = await axios.get(`https://nominatim.openstreetmap.org/search`, {
-        params: { 
-          q: query, 
-          format: 'json', 
-          addressdetails: 1, 
-          limit: 5 
-        }
-      });
+      const res = await axios.get(`https://photon.komoot.io/api/?q=${query}&limit=5`);
       
-      const results = res.data.map((f) => ({
-        name: f.name || f.display_name.split(',')[0], 
-        address: f.display_name,
-        lat: parseFloat(f.lat),
-        lon: parseFloat(f.lon),
+      const results = res.data.features.map((f) => ({
+        name: f.properties.name,
+        address: `${f.properties.city || f.properties.state || ""} ${f.properties.country || ""}`.trim(),
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
       }));
       
-      setSearchResults(results); 
+      setSearchResults(results.filter(r => r.name)); 
     } catch (err) {
       console.error("Location search error:", err);
     }
@@ -357,6 +351,7 @@ export default function ItineraryPage() {
                 style={{ width: "100%", padding: "10px 10px 10px 35px", borderRadius: "8px", border: "1px solid #ccc" }}
               />
               
+              {/* DROPDOWN MENU */}
               {searchResults.length > 0 && (
                 <ul style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", zIndex: 1000, listStyle: "none", margin: 0, padding: 0, border: "1px solid #ccc", borderRadius: "8px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
                   {searchResults.map((res, i) => (
