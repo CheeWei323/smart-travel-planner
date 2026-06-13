@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { FaHotel, FaMapMarkerAlt, FaSearch } from "react-icons/fa";
+import { FaHotel, FaMapMarkerAlt, FaSearch, FaArrowLeft, FaCalendarAlt } from "react-icons/fa";
 import axios from "axios";
 import { getTrips, updateTrip } from "../services/tripService";
+import { getImageForDestination } from "../services/pexelsService";
+import { getCoordinates } from "../services/geocodeService";
 
 import L from "leaflet";
 import icon from "leaflet/dist/images/marker-icon.png";
@@ -90,8 +92,9 @@ function MapUpdater({ center }) {
 export default function ItineraryPage() {
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [tripCovers, setTripCovers] = useState({});
+  const [tripCenter, setTripCenter] = useState([5.4141, 100.3288]); // Defaults to Penang
   
-  // Hotel is tracked per day
   const [dailyHotels, setDailyHotels] = useState({});
   const [dailyPlans, setDailyPlans] = useState({});
   const [activeDay, setActiveDay] = useState(1);
@@ -103,6 +106,22 @@ export default function ItineraryPage() {
   useEffect(() => {
     fetchTrips();
   }, []);
+
+  useEffect(() => {
+    const loadCovers = async () => {
+      const covers = {};
+      for (const trip of trips) {
+        const destName = trip.destination.split(',')[0].trim();
+        const url = await getImageForDestination(destName);
+        covers[trip._id] = url;
+      }
+      setTripCovers(covers);
+    };
+
+    if (trips.length > 0) {
+      loadCovers();
+    }
+  }, [trips]);
 
   const fetchTrips = async () => {
     try {
@@ -116,41 +135,59 @@ export default function ItineraryPage() {
     }
   };
 
-  const handleTripSelect = (e) => {
-    const tripId = e.target.value;
-    const trip = trips.find((t) => t._id === tripId);
+  const handleTripClick = async (trip) => {
     setSelectedTrip(trip);
-    
-    // Load daily hotels and activities from DB
     setDailyHotels(trip?.itinerary?.dailyHotels || {});
     setDailyPlans(trip?.itinerary?.days || {});
     setActiveDay(1);
+
+    // Auto-locate the destination on the map
+    const coords = await getCoordinates(trip.destination);
+    if (coords) {
+      setTripCenter([coords.latitude, coords.longitude]);
+    }
+  };
+
+  const handleBackToTrips = () => {
+    setSelectedTrip(null);
+    setSearchQuery("");
+    setSearchResults([]);
   };
 
   const handleSearch = async (e) => {
     const query = e.target.value;
     setSearchQuery(query);
+    
     if (query.length < 3) {
       setSearchResults([]);
       return;
     }
+
     try {
-      const res = await axios.get(`https://photon.komoot.io/api/?q=${query}&limit=5`);
-      const results = res.data.features.map((f) => ({
-        name: f.properties.name,
-        address: `${f.properties.city || f.properties.state || ""} ${f.properties.country || ""}`.trim(),
-        lat: f.geometry.coordinates[1],
-        lon: f.geometry.coordinates[0],
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search`, {
+        params: { 
+          q: query, 
+          format: 'json', 
+          addressdetails: 1, 
+          limit: 5 
+        }
+      });
+      
+      const results = res.data.map((f) => ({
+        name: f.name || f.display_name.split(',')[0], 
+        address: f.display_name,
+        lat: parseFloat(f.lat),
+        lon: parseFloat(f.lon),
       }));
-      setSearchResults(results.filter(r => r.name)); 
+      
+      setSearchResults(results); 
     } catch (err) {
-      console.error("Photon API error:", err);
+      console.error("Location search error:", err);
     }
   };
 
   const handleAddLocation = (loc) => {
     if (searchTarget === "hotel") {
-      // Assign hotel specifically to the active day
       setDailyHotels(prev => ({ ...prev, [activeDay]: loc }));
     } else {
       setDailyPlans((prev) => ({
@@ -180,13 +217,9 @@ export default function ItineraryPage() {
     ? Math.ceil((new Date(selectedTrip.endDate) - new Date(selectedTrip.startDate)) / (1000 * 60 * 60 * 24)) + 1
     : 0;
 
-  // ==========================================
-  // DAY SPECIFIC MAP DATA SETUP 
-  // ==========================================
   const currentHotel = dailyHotels[activeDay] || null;
   const currentDayLocations = dailyPlans[activeDay] || [];
   
-  // Optimize starting from TODAY'S hotel
   const optimizedLocations = currentHotel 
     ? getOptimizedRoute(currentHotel, currentDayLocations) 
     : currentDayLocations;
@@ -195,7 +228,7 @@ export default function ItineraryPage() {
     ? [currentHotel.lat, currentHotel.lon] 
     : optimizedLocations.length > 0 
       ? [optimizedLocations[0].lat, optimizedLocations[0].lon] 
-      : [5.4141, 100.3288]; 
+      : tripCenter; 
   
   const routeCoords = [];
   if (currentHotel) routeCoords.push([currentHotel.lat, currentHotel.lon]);
@@ -204,28 +237,98 @@ export default function ItineraryPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       
-      {/* TRIP SELECTOR */}
-      <div style={sectionStyle}>
-        <h3 style={titleStyle}>Select Upcoming Trip</h3>
-        <div style={{ padding: "15px" }}>
-          <select 
-            onChange={handleTripSelect} 
-            defaultValue=""
-            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ccc" }}
-          >
-            <option value="" disabled>-- Choose a trip --</option>
-            {trips.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.destination} ({new Date(t.startDate).toLocaleDateString()})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {/* VIEW 1: TRIP SELECTION WITH DESTINATION COVERS */}
+      {!selectedTrip ? (
+        <div style={sectionStyle}>
+          <h3 style={titleStyle}>Your Upcoming Trips</h3>
+          <p style={{ margin: "5px 15px 15px 15px", color: "gray" }}>Select an upcoming trip below to view and edit its itinerary.</p>
+          
+          <div style={{ padding: "0 15px 20px 15px", display: "flex", flexWrap: "wrap", gap: "20px" }}>
+            {trips.length === 0 ? (
+              <p style={{ fontStyle: "italic", color: "gray" }}>No upcoming trips found. Go to Create Trip to add one!</p>
+            ) : (
+              trips.map((trip) => {
+                const coverUrl = tripCovers[trip._id] || "https://images.unsplash.com/photo-1506929562872-bb421503ef21?auto=format&fit=crop&w=600&q=80"; 
 
-      {selectedTrip && (
+                return (
+                  <div
+                    key={trip._id}
+                    onClick={() => handleTripClick(trip)}
+                    style={{
+                      position: "relative",
+                      borderRadius: "16px",
+                      width: "290px",
+                      height: "200px",
+                      cursor: "pointer",
+                      backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.85) 30%, rgba(0,0,0,0.2) 100%), url(${coverUrl})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      color: "white",
+                      overflow: "hidden",
+                      transition: "all 0.25s ease-in-out",
+                      boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "flex-end",
+                      padding: "20px",
+                      boxSizing: "border-box"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-6px)";
+                      e.currentTarget.style.boxShadow = "0 12px 20px rgba(0,0,0,0.3)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.15)";
+                    }}
+                  >
+                    <h4 style={{ margin: 0, fontSize: "20px", fontWeight: "bold", textShadow: "1px 1px 4px rgba(0,0,0,0.6)" }}>
+                      {trip.destination}
+                    </h4>
+                    
+                    <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#e2e8f0", display: "flex", alignItems: "center", gap: "6px", textShadow: "1px 1px 3px rgba(0,0,0,0.5)" }}>
+                      <FaCalendarAlt size={12} color="#cbd5e1" /> 
+                      {new Date(trip.startDate).toLocaleDateString()}
+                    </p>
+
+                    <div style={{ marginTop: "12px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "bold", color: "#60a5fa" }}>
+                      Edit Itinerary →
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+
+        /* VIEW 2: ITINERARY MAP PLATFORM */
         <>
-          {/* SEARCH COMPONENT */}
+          <div style={{ ...sectionStyle, padding: "15px", display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <button 
+                onClick={handleBackToTrips}
+                style={{ background: "none", border: "none", padding: "0 0 8px 0", color: "#64748b", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: "bold" }}
+                onMouseEnter={(e) => e.target.style.color = "#2563eb"}
+                onMouseLeave={(e) => e.target.style.color = "#64748b"}
+              >
+                <FaArrowLeft /> Back to Trips
+              </button>
+              <h2 style={{ margin: 0, color: "#0f172a" }}>{selectedTrip.destination} Itinerary</h2>
+              <p style={{ margin: 0, color: "gray", fontSize: "14px" }}>
+                {new Date(selectedTrip.startDate).toLocaleDateString()} to {new Date(selectedTrip.endDate).toLocaleDateString()}
+              </p>
+            </div>
+            <button 
+              onClick={handleSaveItinerary} 
+              style={{ padding: "12px 24px", background: "#10b981", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "15px" }}
+              onMouseEnter={(e) => e.target.style.background = "#059669"}
+              onMouseLeave={(e) => e.target.style.background = "#10b981"}
+            >
+              Save Itinerary
+            </button>
+          </div>
+
           <div style={{ ...sectionStyle, padding: "15px" }}>
             <h3 style={{ margin: "0 0 15px 0" }}>Add Locations for Day {activeDay}</h3>
             
@@ -260,7 +363,7 @@ export default function ItineraryPage() {
                     <li 
                       key={i} 
                       onClick={() => handleAddLocation(res)}
-                      style={{ padding: "10px", borderBottom: "1px solid #eee", cursor: "pointer" }}
+                      style={{ padding: "10px", borderBottom: "1px solid #eee", cursor: "pointer", color: "black" }}
                       onMouseEnter={(e) => e.target.style.background = "#f3f4f6"}
                       onMouseLeave={(e) => e.target.style.background = "white"}
                     >
@@ -274,25 +377,17 @@ export default function ItineraryPage() {
 
           <div style={{ display: "flex", gap: "20px" }}>
             
-            {/* LEFT COLUMN: Itinerary Planner */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "15px" }}>
-              
-              {/* Day Tabs - Updated with CSS Grid to fix width issue */}
-              <div style={{ 
-                display: "grid", 
-                gridTemplateColumns: "repeat(8, 1fr)", 
-                gap: "5px", 
-                paddingBottom: "5px" 
-              }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: "5px", paddingBottom: "5px" }}>
                 {Array.from({ length: totalDays }).map((_, i) => (
                   <button
                     key={i + 1}
                     onClick={() => setActiveDay(i + 1)}
                     style={{ 
                       ...tabStyle, 
-                      justifyContent: "center", // Centers the text in the grid block
-                      padding: "8px 2px",       // Reduces side padding so it fits well
-                      fontSize: "12px",         // Slightly smaller font for tight spaces
+                      justifyContent: "center", 
+                      padding: "8px 2px",       
+                      fontSize: "12px",         
                       background: activeDay === i + 1 ? "#2563eb" : "white", 
                       color: activeDay === i + 1 ? "white" : "black", 
                       border: "1px solid #ccc" 
@@ -303,19 +398,17 @@ export default function ItineraryPage() {
                 ))}
               </div>
 
-              {/* Day Hotel Info */}
               <div style={{ background: "#0f172a", color: "white", padding: "15px", borderRadius: "12px" }}>
                 <h4 style={{ margin: "0 0 5px 0", display: "flex", alignItems: "center", gap: "8px" }}><FaHotel /> Day {activeDay} Hotel</h4>
                 {currentHotel ? <p style={{ margin: 0 }}>{currentHotel.name}</p> : <p style={{ margin: 0, color: "gray" }}>No hotel selected for this day.</p>}
               </div>
 
-              {/* Day Activities */}
               <div style={{ background: "white", padding: "15px", borderRadius: "12px", boxShadow: "0 2px 6px rgba(0,0,0,0.08)" }}>
-                <h4 style={{ margin: "0 0 10px 0" }}>Day {activeDay} Route</h4>
+                <h4 style={{ margin: "0 0 10px 0", color: "black" }}>Day {activeDay} Route</h4>
                 {optimizedLocations.length === 0 ? (
                   <p style={{ color: "gray", fontSize: "14px" }}>No activities added for this day.</p>
                 ) : (
-                  <ul style={{ paddingLeft: "20px", margin: 0 }}>
+                  <ul style={{ paddingLeft: "20px", margin: 0, color: "black" }}>
                     {optimizedLocations.map((loc, i) => (
                       <li key={i} style={{ marginBottom: "10px" }}>
                         <strong>Stop {i + 1}: {loc.name}</strong>
@@ -324,26 +417,19 @@ export default function ItineraryPage() {
                   </ul>
                 )}
               </div>
-
-              <button onClick={handleSaveItinerary} style={{ padding: "12px", background: "#10b981", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>
-                Save Itinerary
-              </button>
             </div>
 
-            {/* RIGHT COLUMN: Map */}
-            <div style={{ flex: 2, height: "500px", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 6px rgba(0,0,0,0.08)", zIndex: 0 }}>
+            <div style={{ flex: 2, height: "500px", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 6px rgba(0, 0, 0, 0.08)", zIndex: 0 }}>
               <MapContainer center={mapCenter} zoom={12} style={{ height: "100%", width: "100%" }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <MapUpdater center={mapCenter} />
                 
-                {/* 🔥 Custom Red Marker for the Hotel */}
                 {currentHotel && (
                   <Marker position={[currentHotel.lat, currentHotel.lon]} icon={redIcon}>
                     <Popup><strong>Day {activeDay} Hotel:</strong> {currentHotel.name}</Popup>
                   </Marker>
                 )}
 
-                {/* Default Blue Markers for Activities */}
                 {optimizedLocations.map((loc, i) => (
                   <Marker key={i} position={[loc.lat, loc.lon]}>
                     <Popup><strong>Stop {i + 1}:</strong> {loc.name}</Popup>
@@ -362,7 +448,6 @@ export default function ItineraryPage() {
   );
 }
 
-// STYLES
 const sectionStyle = {
   background: "white",
   borderRadius: "12px",
@@ -371,7 +456,7 @@ const sectionStyle = {
   flexDirection: "column",
   overflow: "visible", 
 };
-const titleStyle = { margin: 0, padding: "15px 15px 0 15px" };
+const titleStyle = { margin: 0, padding: "15px 15px 0 15px", color: "black" };
 const tabStyle = {
   padding: "8px 16px",
   border: "none",
