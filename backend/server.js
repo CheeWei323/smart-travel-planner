@@ -1,39 +1,20 @@
-const express  = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-require('dotenv').config();
-
-const connectDB = require('./config/db');
-
-const authRoutes = require('./routes/authRoutes');
-const testRoutes = require('./routes/testRoutes');
-const tripRoutes = require("./routes/tripRoutes");
-const checklistRoutes = require("./routes/checklistRoutes");
-const favoriteRoutes = require("./routes/favoriteRoutes");
-
-
-connectDB();
-
-const app = express();
-
-app.use(express.json());
-app.use(cors());
-app.use(helmet());
-
-app.use('/api/auth', authRoutes);
-app.use('/api/test', testRoutes);
-app.use("/api/trips", tripRoutes);
-app.use("/api/checklists", checklistRoutes);
-app.use("/api/favorites", favoriteRoutes);
-
-app.get("/", (req, res) => {
-    res.json({
-        message: "Smart Travel Planner API Running"
-    });
-});
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+const connectDB = require("./config/db");
+const start = async () => {
+  if (!process.env.MONGO_URI || !process.env.JWT_SECRET)
+    throw new Error(
+      "Set MONGO_URI and JWT_SECRET in backend/.env before starting the server",
+    );
+  await connectDB();
+  const app = require("./app");
+  const port = Number(process.env.PORT) || 5000;
+  return app.listen(port, () =>
+    console.log(`TravelWise API listening on port ${port}`),
+  );
+};
+if (require.main === module)
+  start().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+module.exports = start;

@@ -2,6 +2,13 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { deleteUserAndData } = require("../utils/deleteUserData");
+const {
+  fields,
+  text,
+  email: validEmail,
+  password: validPassword,
+  fail,
+} = require("../utils/validation");
 
 const publicUser = (user) => ({
   id: user._id,
@@ -9,156 +16,90 @@ const publicUser = (user) => ({
   email: user.email,
   role: user.role,
 });
-
 const registerUser = async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const email = (req.body.email || "").trim().toLowerCase();
-
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "Username, email and password are required" });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // role is NOT taken from the request body - everyone registers as a normal user
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-    });
-
-    res.status(201).json({
-      message: "User registered successfully",
+  fields(req.body, ["username", "email", "password"]);
+  const username = text(req.body.username, "Username", 80);
+  const email = validEmail(req.body.email);
+  const password = validPassword(req.body.password);
+  if (await User.exists({ email })) fail("Email is already registered", 409);
+  const user = await User.create({
+    username,
+    email,
+    password: await bcrypt.hash(password, 10),
+  });
+  res
+    .status(201)
+    .json({
+      message: "Account created. You can now log in.",
       user: publicUser(user),
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
-
 const loginUser = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const email = (req.body.email || "").trim().toLowerCase();
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ message: "Your account has been suspended. Please contact an admin." });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: publicUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, ["email", "password"]);
+  const email = validEmail(req.body.email);
+  if (
+    typeof req.body.password !== "string" ||
+    Buffer.byteLength(req.body.password, "utf8") > 72
+  )
+    fail("Invalid email or password", 401);
+  const user = await User.findOne({ email });
+  if (!user || !(await bcrypt.compare(req.body.password, user.password)))
+    fail("Invalid email or password", 401);
+  if (!user.isActive)
+    fail("Your account has been suspended. Please contact an admin.", 403);
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+  res.json({ message: "Login successful", token, user: publicUser(user) });
 };
-
+const getProfile = async (req, res) =>
+  res.json({ user: publicUser(await User.findById(req.user.id)) });
 const updateProfile = async (req, res) => {
-  try {
-    const { username, currentPassword, newPassword } = req.body;
-    const email = req.body.email ? req.body.email.trim().toLowerCase() : "";
-
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (username && username.trim()) {
-      user.username = username.trim();
-    }
-
-    if (email && email !== user.email) {
-      const taken = await User.findOne({ email });
-      if (taken) {
-        return res.status(400).json({ message: "Email is already in use" });
-      }
-      user.email = email;
-    }
-
-    if (currentPassword && newPassword) {
-      if (currentPassword === newPassword) {
-        return res.status(400).json({
-          message: "New password cannot be the same as current password",
-        });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-      }
-
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-      if (!isMatch) {
-        return res.status(400).json({ message: "Current password is incorrect" });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
-    }
-
-    await user.save();
-
-    res.status(200).json({
-      message: "Profile updated successfully",
-      user: publicUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  fields(req.body, ["username", "email", "currentPassword", "newPassword"]);
+  if (!Object.keys(req.body).length) fail("Choose a profile field to update");
+  const user = await User.findById(req.user.id);
+  if (!user) fail("Account not found", 404);
+  if (req.body.username !== undefined)
+    user.username = text(req.body.username, "Username", 80);
+  if (req.body.email !== undefined) {
+    const email = validEmail(req.body.email);
+    if (email !== user.email && (await User.exists({ email })))
+      fail("Email is already in use", 409);
+    user.email = email;
   }
+  if (
+    req.body.currentPassword !== undefined ||
+    req.body.newPassword !== undefined
+  ) {
+    const nextPassword = validPassword(req.body.newPassword);
+    if (
+      typeof req.body.currentPassword !== "string" ||
+      !(await bcrypt.compare(req.body.currentPassword, user.password))
+    )
+      fail("Current password is incorrect");
+    if (req.body.currentPassword === nextPassword)
+      fail("New password must differ from your current password");
+    user.password = await bcrypt.hash(nextPassword, 10);
+  }
+  await user.save();
+  res.json({ message: "Profile updated", user: publicUser(user) });
 };
-
-// Users can delete their own account (needs password confirmation)
 const deleteAccount = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const isMatch = await bcrypt.compare(password || "", user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Password is incorrect" });
-    }
-
-    await deleteUserAndData(user._id);
-
-    res.status(200).json({ message: "Account deleted" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, ["password"]);
+  const user = await User.findById(req.user.id);
+  if (!user) fail("Account not found", 404);
+  if (
+    typeof req.body.password !== "string" ||
+    !(await bcrypt.compare(req.body.password, user.password))
+  )
+    fail("Password is incorrect");
+  await deleteUserAndData(user._id);
+  res.json({ message: "Account and associated data deleted" });
 };
-
-module.exports = { registerUser, loginUser, updateProfile, deleteAccount };
+module.exports = {
+  registerUser,
+  loginUser,
+  getProfile,
+  updateProfile,
+  deleteAccount,
+};

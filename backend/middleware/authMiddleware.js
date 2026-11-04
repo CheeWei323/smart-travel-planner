@@ -19,7 +19,9 @@ const protect = async (req, res, next) => {
     }
 
     if (!user.isActive) {
-      return res.status(403).json({ message: "Your account has been suspended" });
+      return res
+        .status(403)
+        .json({ message: "Your account has been suspended" });
     }
 
     // Role is read from the database, never trusted from the token
@@ -38,4 +40,14 @@ const adminOnly = (req, res, next) => {
   return res.status(403).json({ message: "Admin access required" });
 };
 
-module.exports = { protect, adminOnly };
+// Personal travel actions belong to traveler accounts, not the admin portal.
+const travelerOnly = (req, res, next) => {
+  if (req.user?.role === "user") return next();
+  return res
+    .status(403)
+    .json({
+      message:
+        "Personal travel features are available to traveler accounts only",
+    });
+};
+module.exports = { protect, adminOnly, travelerOnly };

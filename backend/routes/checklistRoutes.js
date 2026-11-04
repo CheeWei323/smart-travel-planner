@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
+const { protect, travelerOnly } = require("../middleware/authMiddleware");
+router.use(protect, travelerOnly);
 const {
   addChecklistItem,
   getChecklistByTrip,
@@ -8,9 +9,9 @@ const {
   deleteChecklistItem,
 } = require("../controllers/checklistController");
 
-router.post("/", protect, addChecklistItem);
-router.get("/:tripId", protect, getChecklistByTrip);
-router.put("/:id", protect, updateChecklistItem);
-router.delete("/:id", protect, deleteChecklistItem);
+router.post("/", addChecklistItem);
+router.get("/:tripId", getChecklistByTrip);
+router.put("/:id", updateChecklistItem);
+router.delete("/:id", deleteChecklistItem);
 
 module.exports = router;

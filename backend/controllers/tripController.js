@@ -1,74 +1,71 @@
+const mongoose = require("mongoose");
 const Trip = require("../models/Trip");
-
-// CREATE
+const Checklist = require("../models/Checklist");
+const { tripInput } = require("../utils/tripInput");
+const { fields, text, id, fail } = require("../utils/validation");
+const { deleteTripAndData } = require("../utils/deleteUserData");
 const createTrip = async (req, res) => {
-  try {
-    // Injects the authenticated user's ID into the trip data before saving
-    const tripData = { ...req.body, userId: req.user.id };
-    const trip = await Trip.create(tripData);
-    res.status(201).json(trip);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, [
+    "destination",
+    "startDate",
+    "endDate",
+    "budget",
+    "hotel",
+    "flight",
+    "carRental",
+    "activities",
+    "itinerary",
+    "checklist",
+  ]);
+  const { checklist = [], ...body } = req.body;
+  if (!Array.isArray(checklist) || checklist.length > 100)
+    fail("A trip can start with up to 100 checklist tasks");
+  const tasks = checklist.map((task) => text(task, "Task", 300));
+  const data = tripInput(body);
+  const trip = await mongoose.connection.transaction(async (session) => {
+    const [created] = await Trip.create([{ ...data, userId: req.user.id }], {
+      session,
+    });
+    if (tasks.length)
+      await Checklist.insertMany(
+        tasks.map((task) => ({
+          task,
+          tripId: created._id,
+          userId: req.user.id,
+        })),
+        { session },
+      );
+    return created;
+  });
+  res.status(201).json(trip);
 };
-
-// GET ALL FOR AUTHENTICATED USER ONLY
-const getTrips = async (req, res) => {
-  try {
-    // Filters the database to ONLY return trips matching the user's ID
-    const trips = await Trip.find({ userId: req.user.id });
-    res.json(trips);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+const getTrips = async (req, res) =>
+  res.json(
+    await Trip.find({ userId: req.user.id }).sort({
+      startDate: 1,
+      createdAt: -1,
+    }),
+  );
+const getTrip = async (req, res) => {
+  const trip = await Trip.findOne({
+    _id: id(req.params.id),
+    userId: req.user.id,
+  });
+  if (!trip) fail("Trip not found", 404);
+  res.json(trip);
 };
-
-// DELETE
-const deleteTrip = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Ensures the user can only delete the trip if they own it
-    const deletedTrip = await Trip.findOneAndDelete({ _id: id, userId: req.user.id });
-
-    if (!deletedTrip) {
-      return res.status(404).json({ message: "Trip record not found or access unauthorized" });
-    }
-
-    res.json({ message: "Trip deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// EDIT
 const updateTrip = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Never allow the owner field to be changed through the request body
-    const { userId, ...updateData } = req.body;
-
-    // Ensures the user can only update the trip if they own it
-    const updatedTrip = await Trip.findOneAndUpdate(
-      { _id: id, userId: req.user.id },
-      updateData,
-      { new: true }
-    );
-
-    if (!updatedTrip) {
-      return res.status(404).json({ message: "Trip record not found or access unauthorized" });
-    }
-
-    res.json(updatedTrip);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  const trip = await Trip.findOne({
+    _id: id(req.params.id),
+    userId: req.user.id,
+  });
+  if (!trip) fail("Trip not found", 404);
+  Object.assign(trip, tripInput(req.body, trip));
+  await trip.save();
+  res.json(trip);
 };
-
-module.exports = {
-  createTrip,
-  getTrips,
-  deleteTrip,
-  updateTrip,
+const deleteTrip = async (req, res) => {
+  await deleteTripAndData({ _id: id(req.params.id), userId: req.user.id });
+  res.json({ message: "Trip and checklist deleted" });
 };
+module.exports = { createTrip, getTrips, getTrip, updateTrip, deleteTrip };

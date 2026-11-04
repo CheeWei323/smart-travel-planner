@@ -1,14 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
+const { protect, travelerOnly } = require("../middleware/authMiddleware");
+router.use(protect, travelerOnly);
 const {
   addFavorite,
   getFavorites,
   deleteFavorite,
 } = require("../controllers/favoriteController");
 
-router.post("/", protect, addFavorite);
-router.get("/", protect, getFavorites);
-router.delete("/:id", protect, deleteFavorite);
+router.post("/", addFavorite);
+router.get("/", getFavorites);
+router.delete("/:id", deleteFavorite);
 
 module.exports = router;

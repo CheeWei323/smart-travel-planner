@@ -1,198 +1,94 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import AuthLayout from "../components/AuthLayout";
+import { Notice } from "../components/UI";
 import { registerUser } from "../services/authService";
-
+import { errorMessage } from "../services/api";
 export default function RegisterPage() {
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-
-  const [message, setMessage] = useState("");
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (formData.password !== formData.confirmPassword) {
-      setMessage("Passwords do not match");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    const data = new FormData(event.currentTarget);
+    if (data.get("password") !== data.get("confirmPassword")) {
+      setError("Passwords do not match");
       return;
     }
-
+    setPending(true);
     try {
-      const userData = {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-      };
-
-      const response = await registerUser(userData);
-      setMessage(response.message);
-
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Registration failed");
+      await registerUser({
+        username: data.get("username"),
+        email: data.get("email"),
+        password: data.get("password"),
+      });
+      navigate("/", {
+        replace: true,
+        state: { message: "Account created. Log in to start planning." },
+      });
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setPending(false);
     }
   };
-
   return (
-    <div style={pageStyle}>
-      <div style={cardStyle}>
-        <h2 style={{ color: "white", marginBottom: "25px", fontSize: "28px" }}>Welcome to TravelWise!</h2>
-        
-        {/* The Pill-Shaped Toggle (Sign Up Active) */}
-        <div style={toggleContainer}>
-          <button style={toggleButtonActive}>SIGN UP</button>
-          <button style={toggleButtonInactive} onClick={() => navigate("/")}>LOG IN</button>
-        </div>
-
-        {message && (
-          <p style={{ color: message.includes("failed") || message.includes("match") ? "#ef4444" : "#10b981", fontSize: "14px", marginBottom: "15px" }}>
-            {message}
-          </p>
-        )}
-        
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-          <input 
-            type="text" name="username" placeholder="Enter username" required
-            value={formData.username} onChange={handleChange}
-            style={inputStyle}
+    <AuthLayout
+      title="Adventure starts here."
+      subtitle="Create your account and make your first plan."
+    >
+      <Notice>{error}</Notice>
+      <form className="form-stack" onSubmit={submit}>
+        <label>
+          Your name
+          <input
+            name="username"
+            required
+            maxLength={80}
+            autoComplete="nickname"
+            placeholder="How should we call you?"
           />
-          <input 
-            type="email" name="email" placeholder="Email (Login)" required
-            value={formData.email} onChange={handleChange}
-            style={inputStyle}
+        </label>
+        <label>
+          Email address
+          <input
+            name="email"
+            type="email"
+            required
+            maxLength={254}
+            autoComplete="email"
+            placeholder="you@example.com"
           />
-          <input 
-            type="password" name="password" placeholder="Enter password" required
-            value={formData.password} onChange={handleChange}
-            style={inputStyle}
+        </label>
+        <label>
+          Password
+          <input
+            name="password"
+            type="password"
+            required
+            minLength={6}
+            autoComplete="new-password"
           />
-          <input 
-            type="password" name="confirmPassword" placeholder="Confirm password" required
-            value={formData.confirmPassword} onChange={handleChange}
-            style={inputStyle}
+          <small>At least 6 characters; up to 72 bytes.</small>
+        </label>
+        <label>
+          Confirm password
+          <input
+            name="confirmPassword"
+            type="password"
+            required
+            minLength={6}
+            autoComplete="new-password"
           />
-          <button type="submit" style={buttonStyle}>Create Account</button>
-        </form>
-      </div>
-    </div>
+        </label>
+        <button className="button full" disabled={pending}>
+          {pending ? "Creating account…" : "Create account"}
+        </button>
+      </form>
+      <p className="auth-switch">
+        Already have an account? <Link to="/">Log in</Link>
+      </p>
+    </AuthLayout>
   );
 }
-
-// --- STYLES & ANIMATION ---
-const pageStyle = {
-  height: "100vh",
-  width: "100vw",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  background: "linear-gradient(-45deg, #0f172a, #1e1b4b, #312e81, #0f172a)",
-  backgroundSize: "400% 400%",
-  animation: "gradient 15s ease infinite",
-};
-
-//  Injecting body margin reset alongside the animation
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    box-sizing: border-box;
-    overflow-x: hidden;
-  }
-  @keyframes gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-`;
-if (!document.head.innerHTML.includes("@keyframes gradient")) {
-  document.head.appendChild(styleSheet);
-}
-
-const cardStyle = {
-  background: "rgba(255, 255, 255, 0.05)",
-  backdropFilter: "blur(10px)",
-  border: "1px solid rgba(255, 255, 255, 0.1)",
-  padding: "40px",
-  borderRadius: "20px",
-  width: "350px",
-  textAlign: "center",
-  boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
-};
-
-// Toggle Styles
-const toggleContainer = {
-  display: "flex",
-  background: "rgba(0, 0, 0, 0.4)",
-  borderRadius: "12px",
-  padding: "4px",
-  marginBottom: "25px",
-};
-
-const toggleButtonActive = {
-  flex: 1,
-  padding: "12px",
-  background: "rgba(255, 255, 255, 0.15)",
-  color: "white",
-  border: "none",
-  borderRadius: "8px",
-  fontWeight: "bold",
-  fontSize: "14px",
-  letterSpacing: "1px",
-  cursor: "default",
-};
-
-const toggleButtonInactive = {
-  flex: 1,
-  padding: "12px",
-  background: "transparent",
-  color: "#9ca3af",
-  border: "none",
-  borderRadius: "8px",
-  fontWeight: "bold",
-  fontSize: "14px",
-  letterSpacing: "1px",
-  cursor: "pointer",
-  transition: "color 0.2s",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "14px 12px",
-  borderRadius: "8px",
-  border: "1px solid rgba(255, 255, 255, 0.05)",
-  background: "rgba(0, 0, 0, 0.2)",
-  color: "white",
-  boxSizing: "border-box",
-  outline: "none",
-  fontSize: "14px"
-};
-
-const buttonStyle = {
-  width: "100%",
-  padding: "14px",
-  borderRadius: "8px",
-  border: "none",
-  background: "#3b82f6",
-  color: "white",
-  fontWeight: "bold",
-  fontSize: "16px",
-  cursor: "pointer",
-  marginTop: "10px",
-  transition: "background 0.2s ease",
-};

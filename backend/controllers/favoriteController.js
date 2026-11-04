@@ -1,45 +1,31 @@
 const Favorite = require("../models/Favorite");
-
-// CREATE: Add a new favorite destination
+const { fields, text, id, fail } = require("../utils/validation");
 const addFavorite = async (req, res) => {
-  try {
-    const { destination } = req.body;
-    
-    // Check if it already exists to prevent duplicates
-    const existing = await Favorite.findOne({ destination, userId: req.user.id });
-    if (existing) {
-      return res.status(400).json({ message: "Already in favorites" });
-    }
-
-    const favorite = await Favorite.create({
-      destination,
-      userId: req.user.id,
-    });
-    res.status(201).json(favorite);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, ["destination"]);
+  const destination = text(req.body.destination, "Destination", 200);
+  if (
+    await Favorite.findOne({ destination, userId: req.user.id }).collation({
+      locale: "en",
+      strength: 2,
+    })
+  )
+    fail("Already in favorites", 409);
+  res
+    .status(201)
+    .json(await Favorite.create({ destination, userId: req.user.id }));
 };
-
-// READ: Get all favorites for the logged-in user
-const getFavorites = async (req, res) => {
-  try {
-    const favorites = await Favorite.find({ userId: req.user.id });
-    res.status(200).json(favorites);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// DELETE: Remove a favorite destination
+const getFavorites = async (req, res) =>
+  res.json(
+    await Favorite.find({ userId: req.user.id }).sort({ createdAt: -1 }),
+  );
 const deleteFavorite = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await Favorite.findOneAndDelete({ _id: id, userId: req.user.id });
-    res.status(200).json({ message: "Favorite removed" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  if (
+    !(await Favorite.findOneAndDelete({
+      _id: id(req.params.id),
+      userId: req.user.id,
+    }))
+  )
+    fail("Favorite not found", 404);
+  res.json({ message: "Favorite removed" });
 };
-
 module.exports = { addFavorite, getFavorites, deleteFavorite };

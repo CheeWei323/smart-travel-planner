@@ -1,11 +1,14 @@
 const mongoose = require("mongoose");
 
-const locationSchema = new mongoose.Schema({
-  name: String,
-  address: String,
-  lat: Number,
-  lon: Number
-}, { _id: false });
+const locationSchema = new mongoose.Schema(
+  {
+    name: String,
+    address: String,
+    lat: Number,
+    lon: Number,
+  },
+  { _id: false },
+);
 
 const tripSchema = new mongoose.Schema(
   {
@@ -14,6 +17,7 @@ const tripSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      immutable: true,
     },
     destination: {
       type: String,
@@ -29,6 +33,7 @@ const tripSchema = new mongoose.Schema(
     },
     budget: {
       type: Number,
+      min: 0,
       default: 0,
     },
     hotel: {
@@ -51,18 +56,18 @@ const tripSchema = new mongoose.Schema(
       dailyHotels: {
         type: Map,
         of: locationSchema,
-        default: {}
+        default: {},
       },
       days: {
         type: Map,
         of: [locationSchema],
-        default: {}
-      }
-    }
+        default: {},
+      },
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 module.exports = mongoose.model("Trip", tripSchema);
