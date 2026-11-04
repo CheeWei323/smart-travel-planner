@@ -1,0 +1,28 @@
+{
+  "name": "smart-travel-planner",
+  "version": "1.0.0",
+  "description": "A full-stack travel planner application featuring a Node.js backend and a React frontend. This project includes user authentication with JWT, protected API routes, and integration with MongoDB for data management.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "frontend": "npm run dev --prefix frontend",
+    "backend": "npm run dev --prefix backend",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CheeWei323/smart-travel-planner.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/CheeWei323/smart-travel-planner/issues"
+  },
+  "homepage": "https://github.com/CheeWei323/smart-travel-planner#readme",
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
+
