@@ -1,17 +1,20 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const { csrfBootstrap } = require("../utils/cookieSession");
 
 const { protect } = require("../middleware/authMiddleware");
 
 const {
   registerUser,
   loginUser,
+  logoutUser,
   getProfile,
   updateProfile,
   deleteAccount,
 } = require("../controllers/authController");
 
 const router = express.Router();
+router.get("/csrf", csrfBootstrap);
 
 // Slow down brute-force attempts on login/register
 const authLimiter = rateLimit({
@@ -23,6 +26,7 @@ const authLimiter = rateLimit({
 router.post("/register", authLimiter, registerUser);
 
 router.post("/login", authLimiter, loginUser);
+router.post("/logout", protect, logoutUser);
 
 router.put("/profile", protect, updateProfile);
 router.get("/me", protect, getProfile);

@@ -10,9 +10,10 @@ import {
   FaCommentAlt,
 } from "react-icons/fa";
 import { useAuth } from "../hooks/useAuth";
+import { Notice } from "./UI";
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, logoutPending, logoutError } = useAuth();
   const links = [
     ["/dashboard", FaHome, "Dashboard"],
     ["/trips", FaSuitcase, "My trips"],
@@ -59,9 +60,9 @@ export default function Layout() {
               <small>Your next adventure awaits</small>
             </span>
           </div>
-          <button className="nav-link logout" onClick={logout}>
+          <button className="nav-link logout" onClick={logout} disabled={logoutPending}>
             <FaSignOutAlt />
-            Log out
+            {logoutPending ? "Logging out…" : "Log out"}
           </button>
         </div>
       </aside>
@@ -80,12 +81,14 @@ export default function Layout() {
               aria-label="Log out"
               title="Log out"
               onClick={logout}
+              disabled={logoutPending}
             >
               <FaSignOutAlt />
             </button>
           </div>
         </header>
         <main id="main-content">
+          <Notice>{logoutError}</Notice>
           <Outlet />
         </main>
         <footer>TravelWise · A little planning. A lot of possibility.</footer>

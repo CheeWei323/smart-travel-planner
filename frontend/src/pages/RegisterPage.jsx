@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 import { Notice } from "../components/UI";
 import { registerUser } from "../services/authService";
 import { errorMessage } from "../services/api";
+import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_HINT,
+  newPasswordError,
+} from "../utils/passwordPolicy";
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -12,6 +18,11 @@ export default function RegisterPage() {
     event.preventDefault();
     setError("");
     const data = new FormData(event.currentTarget);
+    const policyError = newPasswordError(data.get("password"));
+    if (policyError) {
+      setError(policyError);
+      return;
+    }
     if (data.get("password") !== data.get("confirmPassword")) {
       setError("Passwords do not match");
       return;
@@ -61,27 +72,21 @@ export default function RegisterPage() {
             placeholder="you@example.com"
           />
         </label>
-        <label>
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
-          <small>At least 6 characters; up to 72 bytes.</small>
-        </label>
-        <label>
-          Confirm password
-          <input
-            name="confirmPassword"
-            type="password"
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
-        </label>
+        <PasswordInput
+          label="Password"
+          name="password"
+          required
+          minLength={MIN_PASSWORD_LENGTH}
+          autoComplete="new-password"
+          hint={PASSWORD_HINT}
+        />
+        <PasswordInput
+          label="Confirm password"
+          name="confirmPassword"
+          required
+          minLength={MIN_PASSWORD_LENGTH}
+          autoComplete="new-password"
+        />
         <button className="button full" disabled={pending}>
           {pending ? "Creating account…" : "Create account"}
         </button>

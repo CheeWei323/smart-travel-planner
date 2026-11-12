@@ -7,6 +7,7 @@ const User = require("../models/User");
 const Trip = require("../models/Trip");
 const Checklist = require("../models/Checklist");
 const Announcement = require("../models/Announcement");
+const { password: validPassword } = require("../utils/validation");
 let database, server;
 const stop = async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
@@ -26,7 +27,7 @@ const stop = async () => {
     replSet: { count: 1 },
   });
   await mongoose.connect(database.getUri());
-  const password = await bcrypt.hash("DemoTravel123!", 10);
+  const password = await bcrypt.hash(validPassword("Demo travel sample passphrase"), 10);
   const [traveler, admin] = await User.create([
     { username: "Jamie", email: "traveler@example.test", password },
     { username: "Admin", email: "admin@example.test", password, role: "admin" },
@@ -78,7 +79,7 @@ const stop = async () => {
     "127.0.0.1",
     () =>
       console.log(
-        "Disposable demo ready. Traveler: traveler@example.test; administrator: admin@example.test; demo password: DemoTravel123!",
+        "Disposable demo ready. Traveler: traveler@example.test; administrator: admin@example.test; demo password: Demo travel sample passphrase",
       ),
   );
   process.on("SIGINT", stop);

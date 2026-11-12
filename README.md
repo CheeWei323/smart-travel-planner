@@ -1,21 +1,17 @@
 # TravelWise Smart Travel Planner
 
-TravelWise is our Web API assignment project. It uses React and Vite for the website, Express and Node.js for the API, and MongoDB for data storage.
+TravelWise is a travel planning system built with React, Vite, Express, Node.js and MongoDB.
 
-The system has two separate portals:
+- **Traveler portal:** trips, itineraries, budgets, favorites, checklists, account settings and feedback.
+- **Admin portal:** dashboard, users, trip management, announcements, feedback management and account settings. Administrators use the management portal rather than personal travel features.
 
-- **Traveler portal:** trips, itineraries, budgets, favorites, checklists, profile and feedback.
-- **Admin portal:** dashboard, user management, trip management, announcements, feedback management and administrator settings. Admins do not use personal travel features.
+## Requirements
 
-Additional features and security improvements are planned for a separate assignment phase.
+- Git
+- Node.js 22.x, version **22.13 or newer**, with npm. The project was checked using Node.js 22.16.
+- A MongoDB Atlas connection, or a local MongoDB replica set
 
-## Set up on a teammate's computer
-
-### 1 Install the required software
-
-Install **Git** and **Node.js 22 LTS**, using version **22.12 or newer**. npm comes with Node.js. This project was checked using Node.js 22.16.
-
-Check the installation in Command Prompt, PowerShell or the VS Code terminal:
+Check your installed versions:
 
 ```bash
 git --version
@@ -23,19 +19,16 @@ node --version
 npm --version
 ```
 
-We use **MongoDB Atlas** for the shared development database. You do not need to install MongoDB locally when using Atlas.
+MongoDB does not need to be installed locally when using Atlas. A standalone local MongoDB server is insufficient because some operations use database transactions.
 
-### 2 Download the project
-
-After the team lead pushes the updated branch, run:
+## 1. Download the project
 
 ```bash
-git clone https://github.com/CheeWei323/smart-travel-planner.git
+git clone --branch feature/admin-portal-and-security-plan https://github.com/CheeWei323/smart-travel-planner.git
 cd smart-travel-planner
-git switch feature/admin-portal-and-security-plan
 ```
 
-If the project is already downloaded, open its folder in the terminal and run:
+If you already have a clean checkout, update the same branch:
 
 ```bash
 git fetch origin
@@ -43,21 +36,23 @@ git switch feature/admin-portal-and-security-plan
 git pull --ff-only
 ```
 
-Save or commit your own work before switching branches. If the team later merges this branch into `main`, use `main` instead.
+Save any uncommitted work before switching branches or pulling updates.
 
-### 3 Install the project packages
+## 2. Install dependencies
 
-Run this from the **main project folder**, where the root `package.json` is located:
+Run this from the main project folder, where the root `package.json` is located:
 
 ```bash
 npm run setup
 ```
 
-This installs the root, backend and frontend packages. The first installation may take a few minutes because the testing package can download a local MongoDB executable.
+This installs dependencies for the root project, backend and frontend. The first installation may also download a MongoDB executable used by the optional demo and automated tests.
 
-### 4 Add the environment file
+On Windows, if PowerShell blocks `npm.ps1`, use Command Prompt or replace `npm` with `npm.cmd`.
 
-Get the development `.env` file directly from the team lead through a private channel. Place it here:
+## 3. Configure the backend
+
+Place the supplied development environment file at **`backend/.env`**. If no configured file is available, copy `backend/.env.example` to `backend/.env` and enter your settings. Keep an existing configured `.env`.
 
 ```text
 smart-travel-planner/
@@ -65,87 +60,98 @@ smart-travel-planner/
     .env
     .env.example
     server.js
+  frontend/
+  package.json
 ```
 
-The filename must be exactly **`.env`**. Do not put the values only in `.env.example`, and check that Windows has not saved it as `.env.txt`.
+The filename must be exactly `.env`, not `.env.txt`. The server loads `backend/.env`; editing `.env.example` alone does not configure the application.
 
-Private sharing with trusted teammates is acceptable for our development setup. The file grants database/API access, so keep it within the team and out of GitHub, screenshots and public chats. Use development credentials rather than production credentials. The repository already ignores `.env`.
+| Variable | Local setup |
+| --- | --- |
+| `MONGO_URI` | Your MongoDB connection string, including the intended database name. Required. |
+| `JWT_SECRET` | A long random signing secret. Keep the same value across API restarts. Required. |
+| `PORT` | `5000` |
+| `FRONTEND_URL` | `http://127.0.0.1:5173`. The example's `http://localhost:5173` is also supported locally. |
+| `COOKIE_SECURE` | `false` for this local HTTP setup. |
+| `APP_TIMEZONE` | `Asia/Kuala_Lumpur` |
+| `WEATHER_API_KEY` | Optional OpenWeatherMap key for current weather. |
+| `PEXELS_API_KEY` | Optional Pexels key for destination photos. |
+| `ADMIN_EMAIL` | Only needed when creating the initial administrator. |
+| `ADMIN_PASSWORD` | Only needed when creating the initial administrator. |
+| `ADMIN_USERNAME` | Administrator display name, such as `Admin`. |
 
-If no shared file is available, make a copy of `backend/.env.example` named `backend/.env` and fill in your own settings. Do not overwrite an existing `.env` that is already configured.
+The real `.env` is ignored by Git. Commit `.env.example` with placeholders. Provider keys belong in the backend environment file. Planning still works without weather and photo keys, and destinations can be entered manually when location search is unavailable.
 
-### 5 Allow the teammate's database connection
+No `frontend/.env` is needed for normal local setup. Vite forwards `/api` requests to `http://127.0.0.1:5000`.
 
-The Atlas project owner must add the teammate's current public IP under **Network Access / IP Access List**. Sharing `.env` alone does not grant network access to Atlas. Add the individual teammate IP instead of opening the database to everyone. See [MongoDB's IP access instructions](https://www.mongodb.com/docs/atlas/security/ip-access-list/).
+### MongoDB Atlas access
 
-All teammates using the same connection string are working with the same development data. Coordinate before deleting shared records.
+In the Atlas project, add the computer's public IP under **Network Access / IP Access List**. Check that the database username and password in `MONGO_URI` are correct. All computers using the same database connection share the same data.
 
-### 6 Start the system
+## 4. Start the application
 
-From the main project folder, run:
+From the main project folder:
 
 ```bash
 npm run dev
 ```
 
-Open **[http://localhost:5173](http://localhost:5173)** in the browser.
-
 | Service | Address |
 | --- | --- |
-| Website | http://localhost:5173 |
-| API | http://localhost:5000 |
-| Database health check | http://localhost:5000/api/health |
+| Website | http://127.0.0.1:5173 |
+| Backend API | http://127.0.0.1:5000 |
+| Database health check | http://127.0.0.1:5000/api/health |
 
-Keep the terminal open while using the system. Press **Ctrl+C** to stop it. If Windows PowerShell blocks `npm.ps1`, use Command Prompt or run `npm.cmd run dev`.
+Open **http://127.0.0.1:5173** in your browser. Keep the terminal running. Press **Ctrl+C** to stop both services.
 
-### 7 Log in with the correct account
+Use one hostname consistently when accessing the system. Restart the backend after changing its environment settings.
 
-**Travelers:** register on the website, then log in. New registrations receive the normal user role.
+## 5. Sign in
 
-**Administrators:** log in with an existing administrator account. The website opens [the admin portal](http://localhost:5173/admin) automatically. Use a separate named account for each teammate where practical, so administrative actions can be attributed to a person.
+### Traveler account
 
-If using our existing shared database, an administrator already exists. You do **not** need to run the admin setup command again. Ask the team lead for access, or have an existing administrator change your registered account's role from **Admin portal → Users → Make admin**.
+Register on the website, then log in. Registration creates a normal traveler account. New passwords require at least **15 characters** and cannot appear on the local common-password blocklist. Spaces are allowed. Inputs exceeding bcrypt's 72-byte limit are rejected.
 
-If your role changes while you are logged in, log out and log in again.
+### Existing administrator
 
-## Create an administrator for a new database
+Log in with an existing administrator account. The website opens `/admin` automatically. Normal registration does not create administrators. An existing administrator can manage account roles through **Users**.
 
-This is only needed when setting up a fresh database without an administrator.
+### Initial administrator for a new database
 
-1. Open **`backend/.env`**, not `.env.example`.
-2. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and `ADMIN_USERNAME` to your intended account details. Use an email that is not already registered as a normal user.
+1. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and `ADMIN_USERNAME` in `backend/.env`.
+2. Choose an email that is not already registered as an ordinary user. The password must meet the same policy as registration.
 3. Run this from the main project folder:
 
 ```bash
 npm run seed:admin
 ```
 
-4. Wait for **Administrator created. You can now log in.**
-5. Start the system and log in using those details.
+4. Wait for `Administrator created. You can now log in.`
+5. Start the system and sign in with those details.
 
-If the administrator already exists, the command leaves its password and status unchanged. If the email belongs to a normal user, it refuses to promote that account automatically; use an existing administrator's Users page or choose a new email for initial setup.
+The command leaves an existing administrator's password and status unchanged. It refuses to promote an existing ordinary account automatically.
 
-## Environment settings
+## Session behaviour
 
-Teammates who receive the configured development `.env` usually do not need to change these values.
+- Five consecutive incorrect passwords temporarily lock new logins for 15 minutes. Refreshing the page does not reset the lock.
+- Sessions expire after two hours. Log in again when a session ends.
+- Logout, password changes and account suspension invalidate earlier sessions for that account on all devices, including Postman.
+- Authentication uses an HttpOnly cookie. Old Bearer tokens are unsupported. After updating an older checkout, refresh the website and sign in again.
 
-| Setting | What it is used for |
-| --- | --- |
-| `MONGO_URI` | MongoDB Atlas database connection. Required. |
-| `JWT_SECRET` | Private authentication signing secret. Required. |
-| `PORT` | Backend port. Keep `5000` for normal local setup. |
-| `FRONTEND_URL` | Allowed website address. Use `http://localhost:5173`. |
-| `APP_TIMEZONE` | Admin statistics time zone. Use `Asia/Kuala_Lumpur`. |
-| `WEATHER_API_KEY` | Optional OpenWeatherMap key for current weather. |
-| `PEXELS_API_KEY` | Optional Pexels key for destination photos. |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_USERNAME` | Used by the initial admin setup command. |
+These instructions use local HTTP. HTTPS deployment requires certificates, HTTPS website origins and secure cookies. Set `COOKIE_SECURE=true` when HTTPS is configured. Production mode requires secure cookies and HTTPS origins.
 
-Existing backend variables named `VITE_WEATHER_API_KEY` and `VITE_PEXELS_API_KEY` still work for compatibility. Prefer the names above. Private provider keys belong in the backend, not frontend code.
+## Postman setup
 
-Trips can still be planned without weather/photo keys. Location-search outages also allow manual destination entry and manual itinerary coordinates. The weather display shows **current conditions**, not a forecast for arbitrary future travel dates.
+Use `http://127.0.0.1:5000/api` as the base address.
 
-Normal local development needs no `frontend/.env`. The frontend uses a proxy to port `5000`. Only for separate hosting, set `VITE_API_URL` in `frontend/.env`, using the API address ending in `/api`.
+1. Set each request's **Authorization** to **No Auth**. Under **Settings**, leave **Disable cookie jar** switched **off**. Remove manually entered `Cookie` headers.
+2. Send `GET /auth/csrf`. Copy the returned `csrfToken`. Postman stores the nonce cookie automatically.
+3. Send `POST /auth/login` with **Body > raw > JSON** containing your `email` and `password`. Add the copied value as the `X-CSRF-Token` header.
+4. A successful login returns `200`, account details and a new `csrfToken`. Postman stores the session cookie automatically. Use the new CSRF value for subsequent POST, PUT, PATCH and DELETE requests.
+5. Send `GET /auth/me` to check the current account. GET requests do not need the CSRF header.
+6. `GET /admin/stats` returns `403` for an ordinary user and `200` for an administrator. Sign in inside Postman as the intended account before checking its permissions.
 
-If you choose local MongoDB instead of Atlas, it must be configured as a **replica set**. Trip/checklist saves and related-data deletion use transactions and do not work on a standalone MongoDB server.
+The website and Postman keep separate cookie jars. Website login does not refresh Postman's session. If a CSRF value becomes stale, request `/auth/csrf` again before repeating the intended action.
 
 ## Useful commands
 
@@ -153,47 +159,35 @@ Run these from the main project folder:
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start frontend and backend together. |
-| `npm run frontend` | Start only the frontend. |
+| `npm run dev` | Start the backend and frontend together. |
 | `npm run backend` | Start only the backend. |
-| `npm run seed:admin` | Create the initial administrator. |
-| `npm test` | Run isolated API and frontend utility tests. |
+| `npm run frontend` | Start only the frontend. |
+| `npm run seed:admin` | Create the initial administrator for a new database. |
 | `npm run lint --prefix frontend` | Check frontend code. |
-| `npm run build` | Create the production frontend in `frontend/dist`. |
-| `npm run check` | Run tests and the production build. |
+| `npm run build` | Build the frontend into `frontend/dist`. |
 
-The automated API tests use their own temporary database and do not load our shared `.env` or use our real Atlas database. Their first run may need to download MongoDB.
+### Optional temporary demo
 
-For a disposable demo without our shared database, run `npm run dev:demo --prefix backend` in one terminal and `npm run frontend` in another. Stop the normal API first so port `5000` is available. Demo logins are `traveler@example.test` and `admin@example.test`, both with the demo-only password `DemoTravel123!`. Demo data is temporary; these accounts are not created by the real server.
+Stop the normal backend first. Run `npm run dev:demo --prefix backend` in one terminal and `npm run frontend` in another.
 
-## Common setup problems
+- Traveler: `traveler@example.test`
+- Administrator: `admin@example.test`
+- Password for both demo accounts: `Demo travel sample passphrase`
+
+The demo uses temporary data rather than the configured Atlas database. These demo accounts are not created in the normal database.
+
+## Troubleshooting
 
 | Problem | What to check |
 | --- | --- |
-| `Email must contain 1–254 characters` during admin setup | Admin variables are missing from `backend/.env`. Values in `.env.example` alone are not loaded. |
-| `This email belongs to an ordinary account` | Use a new email for initial setup, or ask an existing admin to change the account's role. |
-| Cannot connect to MongoDB | Confirm `MONGO_URI`, database credentials and the teammate's current Atlas IP access entry. |
-| `JWT_SECRET` or `MONGO_URI` is missing | Check the file is `backend/.env`, then restart the API. |
-| Port `5000` or `5173` is already in use | Stop the older project terminal with Ctrl+C, then start one copy of the system. |
-| Weather/photos do not load | Check optional keys and provider availability. Other planning features still work. |
-| Admin still sees the old interface | Refresh the browser. Log out/in if the account role recently changed. |
-| Personal travel pages redirect to `/admin` | The logged-in account is an administrator. Use a normal user account for personal travel planning. |
-| Test download fails | Check internet access and retry `npm test`. This does not require changing our real database. |
-
-## Save the completed work on a new branch
-
-The commands below save the current completed system, separate admin portal and setup guide. Future security-assignment work will be implemented separately.
-
-```bash
-git switch -c feature/admin-portal-and-security-plan
-git status
-git check-ignore backend/.env
-git add .
-git diff --cached --stat
-git commit -m "feat: complete travel planner and separate admin portal"
-git push -u origin feature/admin-portal-and-security-plan
-```
-
-`git check-ignore backend/.env` should print `backend/.env`. Before committing, confirm the staged files do not include the real `.env`. The example files `.env.example` are intended to be committed.
-
-After pushing, share the branch name with teammates. Share the private environment file separately.
+| Missing `MONGO_URI` or `JWT_SECRET` | Put the configured file at `backend/.env`, check the filename and restart the backend. |
+| MongoDB connection fails | Check the connection string, database credentials and Atlas IP access entry. |
+| Port `5000` or `5173` is occupied | Stop the earlier project terminal with Ctrl+C before starting another copy. |
+| Admin setup reports `Email must contain 1–254 characters` | Set the admin variables in `backend/.env`, rather than only `.env.example`. |
+| Admin setup finds an ordinary account | Use an unused email for initial setup, or change the account's role through an existing administrator. |
+| Login reports a temporary lock | Wait for the displayed remaining time. Page refresh and backend restart do not remove the stored lock. |
+| Login returns `429 Too Many Requests` | The separate IP limit is 50 registration/login requests per 15 minutes. Wait for that window to reset. |
+| Postman returns `401` | Log in inside Postman again, confirm cookies are enabled and use the same hostname. Website logout also revokes the account's Postman session. |
+| Postman returns `403 CSRF_INVALID` | Get fresh proof from `/auth/csrf` and send it in `X-CSRF-Token` for the intended request. |
+| Personal travel pages redirect to `/admin` | The current account is an administrator. Use a traveler account for personal planning. |
+| Weather or photos are unavailable | Check optional provider keys and availability. Other planning features remain usable. |

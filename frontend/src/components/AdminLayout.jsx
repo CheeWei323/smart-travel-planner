@@ -10,6 +10,7 @@ import {
   FaSignOutAlt,
 } from "react-icons/fa";
 import { useAuth } from "../hooks/useAuth";
+import { Notice } from "./UI";
 
 const links = [
   ["/admin", FaTachometerAlt, "Dashboard"],
@@ -20,7 +21,7 @@ const links = [
   ["/admin/settings", FaCog, "Account settings"],
 ];
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, logoutPending, logoutError } = useAuth();
   return (
     <div className="app-layout admin-portal">
       <aside className="sidebar">
@@ -58,9 +59,9 @@ export default function AdminLayout() {
               <small>Administrator</small>
             </span>
           </div>
-          <button className="nav-link logout" onClick={logout}>
+          <button className="nav-link logout" onClick={logout} disabled={logoutPending}>
             <FaSignOutAlt />
-            Log out
+            {logoutPending ? "Logging out…" : "Log out"}
           </button>
         </div>
       </aside>
@@ -79,12 +80,14 @@ export default function AdminLayout() {
               aria-label="Log out"
               title="Log out"
               onClick={logout}
+              disabled={logoutPending}
             >
               <FaSignOutAlt />
             </button>
           </div>
         </header>
         <main id="main-content">
+          <Notice>{logoutError}</Notice>
           <Outlet />
         </main>
         <footer>TravelWise · Admin portal</footer>

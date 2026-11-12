@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 import { Notice } from "../components/UI";
 import { errorMessage } from "../services/api";
 export default function LoginPage() {
@@ -49,15 +50,12 @@ export default function LoginPage() {
             placeholder="you@example.com"
           />
         </label>
-        <label>
-          Password
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            required
-          />
-        </label>
+        <PasswordInput
+          label="Password"
+          name="password"
+          autoComplete="current-password"
+          required
+        />
         <button className="button full" disabled={pending}>
           {pending ? "Logging in…" : "Log in"}
         </button>

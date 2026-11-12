@@ -18,6 +18,25 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: true
         },
+        // Server-controlled login state; excluded from ordinary reads and saves.
+        failedLogins: {
+            type: Number,
+            default: 0,
+            min: 0,
+            select: false
+        },
+        lockUntil: {
+            type: Date,
+            default: null,
+            select: false
+        },
+        // Changed atomically by the server; never included in ordinary saves.
+        tokenVersion: {
+            type: Number,
+            default: 0,
+            min: 0,
+            select: false
+        },
         // "user" = normal account, "admin" = can access /api/admin
         role: {
             type: String,

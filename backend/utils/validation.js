@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const commonPasswords = new Set(require("../data/commonPasswords.json"));
 
 const fail = (message, status = 400) => {
   const error = new Error(message);
@@ -34,12 +35,17 @@ const email = (value) => {
   return normalized;
 };
 const password = (value) => {
-  if (
-    typeof value !== "string" ||
-    value.length < 6 ||
-    Buffer.byteLength(value, "utf8") > 72
-  )
-    fail("Password must be at least 6 characters and at most 72 bytes");
+  if (typeof value !== "string" || !value.isWellFormed())
+    fail("Enter a valid password");
+  // Reject oversized input before hashing: bcrypt otherwise truncates at 72 bytes.
+  if (Buffer.byteLength(value, "utf8") > 72)
+    fail("Password is too long. Use a shorter passphrase.");
+  if (Array.from(value).length < 15)
+    fail("Password must be at least 15 characters");
+  // Normalize only the blocklist lookup; preserve the exact password for hashing.
+  const lookup = value.normalize("NFKC").trim().toLowerCase();
+  if (commonPasswords.has(lookup))
+    fail("Choose a less common password or passphrase");
   return value;
 };
 const boolean = (value, label) => {

@@ -9,7 +9,6 @@ const {
 
 const provisionAdmin = async ({ email, password, username = "Admin" }) => {
   email = validEmail(email);
-  password = validPassword(password);
   username = text(username, "Username", 80);
   const existing = await User.findOne({ email });
   // A pre-registered ordinary account must never silently receive admin access.
@@ -18,6 +17,7 @@ const provisionAdmin = async ({ email, password, username = "Admin" }) => {
       "This email belongs to an ordinary account. Choose a new administrator email.",
     );
   if (existing) return { created: false };
+  password = validPassword(password);
   await User.create({
     username,
     email,

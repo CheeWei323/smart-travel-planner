@@ -86,15 +86,22 @@ const updateUser = async (req, res) => {
   const userId = id(req.params.id);
   if (userId === req.user.id)
     fail("You cannot change your own role or account status");
-  const user = await User.findById(userId);
-  if (!user) fail("User not found", 404);
+  const changes = {};
   if (req.body.role !== undefined) {
     if (!["user", "admin"].includes(req.body.role)) fail("Invalid role");
-    user.role = req.body.role;
+    changes.role = req.body.role;
   }
   if (req.body.isActive !== undefined)
-    user.isActive = boolean(req.body.isActive, "Account status");
-  await user.save();
+    changes.isActive = boolean(req.body.isActive, "Account status");
+  const user = await User.findByIdAndUpdate(
+    userId,
+    {
+      $set: changes,
+      ...(changes.isActive === false ? { $inc: { tokenVersion: 1 } } : {}),
+    },
+    { returnDocument: "after", runValidators: true },
+  );
+  if (!user) fail("User not found", 404);
   const { password, ...safe } = user.toObject();
   res.json(safe);
 };

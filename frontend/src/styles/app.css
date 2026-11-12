@@ -143,6 +143,50 @@ input[type="checkbox"] {
   accent-color: var(--teal);
   flex-shrink: 0;
 }
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.password-field > small {
+  font-weight: 400;
+  color: var(--muted);
+}
+.password-input {
+  position: relative;
+  min-width: 0;
+}
+.password-input input {
+  min-width: 0;
+  padding-right: 56px;
+}
+.password-input input::-ms-reveal {
+  display: none;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #106a62;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.password-toggle:hover:not(:disabled) {
+  background: #edf5f1;
+}
 textarea {
   resize: vertical;
 }

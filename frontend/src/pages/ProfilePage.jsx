@@ -4,9 +4,16 @@ import { useAuth } from "../hooks/useAuth";
 import { updateProfile, deleteAccount } from "../services/authService";
 import { errorMessage } from "../services/api";
 import { ConfirmAction, Notice, PageTitle } from "../components/UI";
+import PasswordInput from "../components/PasswordInput";
+import { getSessionId, withSessionLock } from "../utils/session";
+import {
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_HINT,
+  newPasswordError,
+} from "../utils/passwordPolicy";
 
 export default function ProfilePage({ admin = false }) {
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, endSession } = useAuth();
   const navigate = useNavigate();
   const [profileResult, setProfileResult] = useState(null);
   const [passwordResult, setPasswordResult] = useState(null);
@@ -15,6 +22,7 @@ export default function ProfilePage({ admin = false }) {
   const profile = async (event) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
+    const session = getSessionId();
     setPending("profile");
     setProfileResult(null);
     try {
@@ -22,7 +30,7 @@ export default function ProfilePage({ admin = false }) {
         username: values.get("username"),
         email: values.get("email"),
       });
-      updateUser(data.user);
+      if (!updateUser(data.user, session)) return;
       setProfileResult({
         type: "success",
         message: "Your profile is up to date.",
@@ -38,6 +46,11 @@ export default function ProfilePage({ admin = false }) {
     const form = event.currentTarget;
     const values = new FormData(form);
     setPasswordResult(null);
+    const policyError = newPasswordError(values.get("newPassword"));
+    if (policyError) {
+      setPasswordResult({ type: "error", message: policyError });
+      return;
+    }
     if (values.get("newPassword") !== values.get("confirmPassword")) {
       setPasswordResult({
         type: "error",
@@ -46,15 +59,19 @@ export default function ProfilePage({ admin = false }) {
       return;
     }
     setPending("password");
+    const session = getSessionId();
     try {
-      await updateProfile({
-        currentPassword: values.get("currentPassword"),
-        newPassword: values.get("newPassword"),
-      });
-      form.reset();
-      setPasswordResult({
-        type: "success",
-        message: "Your password has been updated.",
+      await withSessionLock(async () => {
+        if (getSessionId() !== session) throw new Error("Your session changed. Refresh the page.");
+        await updateProfile({
+          currentPassword: values.get("currentPassword"),
+          newPassword: values.get("newPassword"),
+        });
+        form.reset();
+        if (endSession("", session, true)) navigate("/", {
+          replace: true,
+          state: { message: "Your password has been updated. Please log in again." },
+        });
       });
     } catch (failure) {
       setPasswordResult({ type: "error", message: errorMessage(failure) });
@@ -63,11 +80,15 @@ export default function ProfilePage({ admin = false }) {
     }
   };
   const remove = async () => {
-    await deleteAccount(deletePassword);
-    logout();
-    navigate("/", {
-      replace: true,
-      state: { message: "Your account and travel data have been deleted." },
+    const session = getSessionId();
+    await withSessionLock(async () => {
+      if (getSessionId() !== session) throw new Error("Your session changed. Refresh the page.");
+      await deleteAccount(deletePassword);
+      if (!endSession("", session, true)) return;
+      navigate("/", {
+        replace: true,
+        state: { message: "Your account and travel data have been deleted." },
+      });
     });
   };
   return (
@@ -123,36 +144,28 @@ export default function ProfilePage({ admin = false }) {
             <Notice type={passwordResult?.type}>
               {passwordResult?.message}
             </Notice>
-            <label>
-              Current password
-              <input
-                name="currentPassword"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-            </label>
+            <PasswordInput
+              label="Current password"
+              name="currentPassword"
+              required
+              autoComplete="current-password"
+            />
             <div className="form-grid">
-              <label>
-                New password
-                <input
-                  name="newPassword"
-                  type="password"
-                  minLength={6}
-                  required
-                  autoComplete="new-password"
-                />
-              </label>
-              <label>
-                Confirm new password
-                <input
-                  name="confirmPassword"
-                  type="password"
-                  minLength={6}
-                  required
-                  autoComplete="new-password"
-                />
-              </label>
+              <PasswordInput
+                label="New password"
+                name="newPassword"
+                minLength={MIN_PASSWORD_LENGTH}
+                required
+                autoComplete="new-password"
+                hint={PASSWORD_HINT}
+              />
+              <PasswordInput
+                label="Confirm new password"
+                name="confirmPassword"
+                minLength={MIN_PASSWORD_LENGTH}
+                required
+                autoComplete="new-password"
+              />
             </div>
             <button className="button secondary" disabled={Boolean(pending)}>
               {pending === "password" ? "Updating…" : "Update password"}
@@ -165,15 +178,12 @@ export default function ProfilePage({ admin = false }) {
                 This permanently removes your account, trips, itineraries,
                 checklists, favorites and feedback. This cannot be undone.
               </p>
-              <label>
-                Confirm your password
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(event) => setDeletePassword(event.target.value)}
-                  autoComplete="current-password"
-                />
-              </label>
+              <PasswordInput
+                label="Confirm your password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                autoComplete="current-password"
+              />
               <ConfirmAction
                 label="Delete my account"
                 title="Permanently delete your account?"

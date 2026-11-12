@@ -24,7 +24,7 @@ import AdminPage from "./pages/AdminPage";
 import FeedbackPage from "./pages/FeedbackPage";
 
 function ProtectedRoute({ role }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionId } = useAuth();
   const location = useLocation();
   if (loading) return <Loading>Checking your account…</Loading>;
   if (!user)
@@ -42,7 +42,7 @@ function ProtectedRoute({ role }) {
         : portalHome(user.role);
     return <Navigate to={destination} replace />;
   }
-  return <Outlet />;
+  return <Outlet key={sessionId} />;
 }
 function GuestRoute() {
   const { user, loading } = useAuth();

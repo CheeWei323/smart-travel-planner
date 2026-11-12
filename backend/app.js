@@ -2,16 +2,23 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const mongoose = require("mongoose");
+const { allowedOrigins } = require("./config/security");
+const { checkOrigin, csrfProtection } = require("./middleware/csrfMiddleware");
 const app = express();
 app.use(helmet());
+app.use("/api", checkOrigin);
 app.use(
   cors({
-    origin: (process.env.FRONTEND_URL || "http://localhost:5173")
-      .split(",")
-      .map((url) => url.trim()),
+    origin: allowedOrigins,
+    credentials: true,
   }),
 );
 app.use(express.json({ limit: "256kb" }));
+app.use("/api", csrfProtection);
+app.use("/api/auth", (_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 app.get("/", (_req, res) =>
   res.json({ message: "Smart Travel Planner API Running" }),
 );
