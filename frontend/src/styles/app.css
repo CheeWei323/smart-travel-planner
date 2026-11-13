@@ -1710,3 +1710,73 @@ td strong {
   white-space: nowrap;
   cursor: pointer;
 }
+
+
+.password-strength {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.password-strength-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.strength-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.strength-bar span {
+  height: 6px;
+  border-radius: 10px;
+  background: #e2e8f0;
+}
+
+.strength-bar .strength-fill.strength-0 {
+  background: #dc2626;
+}
+
+.strength-bar .strength-fill.strength-1 {
+  background: #f97316;
+}
+
+.strength-bar .strength-fill.strength-2 {
+  background: #eab308;
+}
+
+.strength-bar .strength-fill.strength-3 {
+  background: #16a34a;
+}
+
+.strength-bar .strength-fill.strength-4 {
+  background: #15803d;
+}
+
+.strength-text {
+  font-weight: 600;
+}
+
+.strength-text.strength-0 {
+  color: #dc2626;
+}
+
+.strength-text.strength-1 {
+  color: #f97316;
+}
+
+.strength-text.strength-2 {
+  color: #ca8a04;
+}
+
+.strength-text.strength-3 {
+  color: #16a34a;
+}
+
+.strength-text.strength-4 {
+  color: #15803d;
+}

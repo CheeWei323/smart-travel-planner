@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import zxcvbn from "zxcvbn";
@@ -17,7 +18,7 @@ const getPasswordStrength = (password) => {
     "Weak",
     "Fair",
     "Strong",
-    "Strong",
+    "Very Strong",
   ];
 
   return {
@@ -129,11 +130,11 @@ export default function RegisterPage() {
               </div>
 
               <div className="strength-bar">
-                {[0, 1, 2, 3].map((index) => (
+                {[0, 1, 2, 3, 4].map((index) => (
                   <span
                     key={index}
                     className={
-                      index < Math.max(1, strength.score)
+                      index <= strength.score
                         ? `strength-fill strength-${strength.score}`
                         : ""
                     }
