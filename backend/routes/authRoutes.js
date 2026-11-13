@@ -9,6 +9,7 @@ const {
   getProfile,
   updateProfile,
   deleteAccount,
+  exportUserData,
 } = require("../controllers/authController");
 
 const router = express.Router();
@@ -21,12 +22,12 @@ const authLimiter = rateLimit({
 });
 
 router.post("/register", authLimiter, registerUser);
-
 router.post("/login", authLimiter, loginUser);
 
-router.put("/profile", protect, updateProfile);
 router.get("/me", protect, getProfile);
+router.get("/export", protect, exportUserData);
 
+router.put("/profile", protect, updateProfile);
 router.delete("/profile", protect, deleteAccount);
 
 module.exports = router;

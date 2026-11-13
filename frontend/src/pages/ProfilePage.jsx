@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { updateProfile, deleteAccount } from "../services/authService";
+import { updateProfile, deleteAccount, exportUserData } from "../services/authService";
 import { errorMessage } from "../services/api";
 import { ConfirmAction, Notice, PageTitle } from "../components/UI";
 
@@ -12,6 +12,8 @@ export default function ProfilePage({ admin = false }) {
   const [passwordResult, setPasswordResult] = useState(null);
   const [pending, setPending] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
+  const [exportPending, setExportPending] = useState(false);
+  const [exportResult, setExportResult] = useState(null);
   const profile = async (event) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
@@ -70,6 +72,43 @@ export default function ProfilePage({ admin = false }) {
       state: { message: "Your account and travel data have been deleted." },
     });
   };
+  const downloadData = async () => {
+  setExportPending(true);
+  setExportResult(null);
+
+  try {
+    const data = await exportUserData();
+
+    const blob = new Blob(
+      [JSON.stringify(data, null, 2)],
+      { type: "application/json" }
+    );
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "my-travelwise-data.json";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    setExportResult({
+      type: "success",
+      message: "Your data has been downloaded successfully.",
+    });
+  } catch (failure) {
+    setExportResult({
+      type: "error",
+      message: errorMessage(failure),
+    });
+  } finally {
+    setExportPending(false);
+  }
+};
   return (
     <>
       <PageTitle
@@ -91,6 +130,27 @@ export default function ProfilePage({ admin = false }) {
         </aside>
         <div className="form-stack">
           <form className="panel form-stack" onSubmit={profile}>
+            <section className="panel form-stack">
+              <h2>Your personal data</h2>
+
+              <p className="muted">
+                Download a copy of your profile information,
+                travel plans, itineraries and feedback.
+              </p>
+
+              <Notice type={exportResult?.type}>
+                {exportResult?.message}
+              </Notice>
+
+              <button
+                type="button"
+                className="button secondary"
+                onClick={downloadData}
+                disabled={exportPending || Boolean(pending)}
+              >
+                {exportPending ? "Preparing download..." : "Download my data"}
+              </button>
+            </section>
             <h2>Personal details</h2>
             <Notice type={profileResult?.type}>{profileResult?.message}</Notice>
             <label>

@@ -22,6 +22,7 @@ import ItineraryPage from "./pages/ItineraryPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicy";
 
 function ProtectedRoute({ role }) {
   const { user, loading } = useAuth();
@@ -74,6 +75,8 @@ const router = createBrowserRouter(
         <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      
       <Route element={<ProtectedRoute role="user" />}>
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
