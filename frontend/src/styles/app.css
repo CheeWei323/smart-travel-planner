@@ -1785,3 +1785,43 @@ td strong {
 .strength-bar .strength-2 { background: #ad781c; }
 .strength-bar .strength-3,
 .strength-bar .strength-4 { background: var(--teal); }
+
+.security-tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 12px;
+}
+
+.security-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.security-tip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--teal-light, #e6f4f1);
+  color: var(--teal, #0f766e);
+}
+
+.security-tip h3 {
+  margin: 0 0 6px;
+}
+
+.security-tip p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { lazy, Suspense, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { updateProfile, deleteAccount, exportUserData } from "../services/authService";
 import { errorMessage } from "../services/api";
@@ -11,6 +11,7 @@ import {
   PASSWORD_HINT,
   newPasswordError,
 } from "../utils/passwordPolicy";
+const PasswordStrength = lazy(() => import("../components/PasswordStrength"));
 
 export default function ProfilePage({ admin = false }) {
   const { user, updateUser, endSession } = useAuth();
@@ -21,6 +22,7 @@ export default function ProfilePage({ admin = false }) {
   const [deletePassword, setDeletePassword] = useState("");
   const [exportPending, setExportPending] = useState(false);
   const [exportResult, setExportResult] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
   const profile = async (event) => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
@@ -70,6 +72,7 @@ export default function ProfilePage({ admin = false }) {
           newPassword: values.get("newPassword"),
         });
         form.reset();
+        setNewPassword("");
         if (endSession("", session, true)) navigate("/", {
           replace: true,
           state: { message: "Your password has been updated. Please log in again." },
@@ -188,6 +191,18 @@ export default function ProfilePage({ admin = false }) {
               {pending === "profile" ? "Saving…" : "Save profile"}
             </button>
           </form>
+          <section className="panel form-stack">
+            <h2>Security &amp; privacy</h2>
+            <p className="muted">
+              Learn how to protect your account and how your personal information is handled.
+            </p>
+            <div className="profile-actions">
+              <Link to={admin ? "/admin/security-tips" : "/security-tips"} className="button secondary">
+                View Security Tips
+              </Link>
+              <Link to="/privacy-policy" className="button secondary">Read Privacy Policy</Link>
+            </div>
+          </section>
           <form className="panel form-stack" onSubmit={password}>
             <h2>Change password</h2>
             <Notice type={passwordResult?.type}>
@@ -200,14 +215,23 @@ export default function ProfilePage({ admin = false }) {
               autoComplete="current-password"
             />
             <div className="form-grid">
-              <PasswordInput
-                label="New password"
-                name="newPassword"
-                minLength={MIN_PASSWORD_LENGTH}
-                required
-                autoComplete="new-password"
-                hint={PASSWORD_HINT}
-              />
+              <div className="form-stack">
+                <PasswordInput
+                  label="New password"
+                  name="newPassword"
+                  minLength={MIN_PASSWORD_LENGTH}
+                  required
+                  autoComplete="new-password"
+                  hint={PASSWORD_HINT}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                />
+                {newPassword && (
+                  <Suspense fallback={null}>
+                    <PasswordStrength password={newPassword} />
+                  </Suspense>
+                )}
+              </div>
               <PasswordInput
                 label="Confirm new password"
                 name="confirmPassword"

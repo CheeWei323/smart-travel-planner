@@ -23,6 +23,7 @@ import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicy";
+import SecurityTipsPage from "./pages/SecurityTipsPage";
 
 function ProtectedRoute({ role }) {
   const { user, loading, sessionId } = useAuth();
@@ -88,6 +89,7 @@ const router = createBrowserRouter(
           <Route path="/itinerary/:id" element={<ItineraryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/security-tips" element={<SecurityTipsPage />} />
         </Route>
       </Route>
       <Route element={<ProtectedRoute role="admin" />}>
@@ -102,6 +104,7 @@ const router = createBrowserRouter(
           <Route path="feedback" element={<AdminPage section="Feedback" />} />
           <Route path="security" element={<AdminPage section="Security" />} />
           <Route path="settings" element={<ProfilePage admin />} />
+          <Route path="security-tips" element={<SecurityTipsPage admin />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Route>
