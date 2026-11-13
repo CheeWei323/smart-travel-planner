@@ -3,6 +3,8 @@ const Trip = require("../models/Trip");
 const Favorite = require("../models/Favorite");
 const Feedback = require("../models/Feedback");
 const Announcement = require("../models/Announcement");
+const AuditLog = require("../models/AuditLog");
+const { logEvent } = require("../utils/audit");
 const {
   deleteUserAndData,
   deleteTripAndData,
@@ -88,6 +90,8 @@ const updateUser = async (req, res) => {
     fail("You cannot change your own role or account status");
   const user = await User.findById(userId);
   if (!user) fail("User not found", 404);
+  const oldRole = user.role;
+  const wasActive = user.isActive;
   if (req.body.role !== undefined) {
     if (!["user", "admin"].includes(req.body.role)) fail("Invalid role");
     user.role = req.body.role;
@@ -95,6 +99,15 @@ const updateUser = async (req, res) => {
   if (req.body.isActive !== undefined)
     user.isActive = boolean(req.body.isActive, "Account status");
   await user.save();
+  if (user.role !== oldRole)
+    await logEvent(req, "ROLE_CHANGED", {
+      email: user.email,
+      note: `${oldRole} -> ${user.role}`,
+    });
+  if (user.isActive !== wasActive)
+    await logEvent(req, user.isActive ? "USER_REACTIVATED" : "USER_SUSPENDED", {
+      email: user.email,
+    });
   const { password, ...safe } = user.toObject();
   res.json(safe);
 };
@@ -102,7 +115,9 @@ const deleteUser = async (req, res) => {
   const userId = id(req.params.id);
   if (userId === req.user.id)
     fail("Use account settings to delete your own account");
+  const target = await User.findById(userId).select("email");
   await deleteUserAndData(userId);
+  await logEvent(req, "USER_DELETED", { email: target?.email });
   res.json({ message: "User and associated data deleted" });
 };
 const getAllTrips = async (req, res) => {
@@ -194,8 +209,28 @@ const deleteFeedback = async (req, res) => {
     fail("Feedback not found", 404);
   res.json({ message: "Feedback deleted" });
 };
+// Security Logs page: newest 100 events plus the three count cards
+const getAuditLogs = async (_req, res) => {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const [logs, loginsToday, failedToday, newUsersWeek] = await Promise.all([
+    AuditLog.find().sort({ time: -1 }).limit(100).lean(),
+    AuditLog.countDocuments({
+      action: "LOGIN_SUCCESS",
+      time: { $gte: startOfToday },
+    }),
+    AuditLog.countDocuments({
+      action: { $in: ["LOGIN_FAILED", "LOGIN_BLOCKED"] },
+      time: { $gte: startOfToday },
+    }),
+    User.countDocuments({ createdAt: { $gte: weekAgo } }),
+  ]);
+  res.json({ logs, counts: { loginsToday, failedToday, newUsersWeek } });
+};
 module.exports = {
   getStats,
+  getAuditLogs,
   getUsers,
   updateUser,
   deleteUser,

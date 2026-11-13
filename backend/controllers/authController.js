@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { deleteUserAndData } = require("../utils/deleteUserData");
+const { logEvent } = require("../utils/audit");
 const {
   fields,
   text,
@@ -27,6 +28,7 @@ const registerUser = async (req, res) => {
     email,
     password: await bcrypt.hash(password, 10),
   });
+  await logEvent(req, "REGISTER", { userId: user._id, email, success: true });
   res
     .status(201)
     .json({
@@ -43,13 +45,28 @@ const loginUser = async (req, res) => {
   )
     fail("Invalid email or password", 401);
   const user = await User.findOne({ email });
-  if (!user || !(await bcrypt.compare(req.body.password, user.password)))
+  if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
+    await logEvent(req, "LOGIN_FAILED", {
+      userId: user?._id,
+      email,
+      success: false,
+      note: "Wrong email or password",
+    });
     fail("Invalid email or password", 401);
-  if (!user.isActive)
+  }
+  if (!user.isActive) {
+    await logEvent(req, "LOGIN_BLOCKED", {
+      userId: user._id,
+      email,
+      success: false,
+      note: "Account is suspended",
+    });
     fail("Your account has been suspended. Please contact an admin.", 403);
+  }
   const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
+  await logEvent(req, "LOGIN_SUCCESS", { userId: user._id, email, success: true });
   res.json({ message: "Login successful", token, user: publicUser(user) });
 };
 const getProfile = async (req, res) =>

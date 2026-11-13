@@ -1,5 +1,7 @@
 import api from "./api";
 export const getStats = async () => (await api.get("/admin/stats")).data;
+export const getAuditLogs = async () =>
+  (await api.get("/admin/audit-logs")).data;
 export const getUsers = async (q = "") =>
   (await api.get("/admin/users", { params: { q } })).data;
 export const updateUser = async (id, data) =>

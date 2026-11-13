@@ -97,6 +97,7 @@ const router = createBrowserRouter(
             element={<AdminPage section="Announcements" />}
           />
           <Route path="feedback" element={<AdminPage section="Feedback" />} />
+          <Route path="security" element={<AdminPage section="Security" />} />
           <Route path="settings" element={<ProfilePage admin />} />
           <Route path="*" element={<NotFound />} />
         </Route>

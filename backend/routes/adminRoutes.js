@@ -8,6 +8,7 @@ const router = express.Router();
 router.use(protect, adminOnly);
 
 router.get("/stats", c.getStats);
+router.get("/audit-logs", c.getAuditLogs);
 
 router.get("/users", c.getUsers);
 router.put("/users/:id", c.updateUser);
