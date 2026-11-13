@@ -10,6 +10,7 @@ TravelWise is a travel planning system built with React, Vite, Express, Node.js 
 - Git
 - Node.js 22.x, version **22.13 or newer**, with npm. The project was checked using Node.js 22.16.
 - A MongoDB Atlas connection, or a local MongoDB replica set
+- mkcert for locally trusted development certificates
 
 Check your installed versions:
 
@@ -71,8 +72,8 @@ The filename must be exactly `.env`, not `.env.txt`. The server loads `backend/.
 | `MONGO_URI` | Your MongoDB connection string, including the intended database name. Required. |
 | `JWT_SECRET` | A long random signing secret. Keep the same value across API restarts. Required. |
 | `PORT` | `5000` |
-| `FRONTEND_URL` | `http://127.0.0.1:5173`. The example's `http://localhost:5173` is also supported locally. |
-| `COOKIE_SECURE` | `false` for this local HTTP setup. |
+| `FRONTEND_URL` | `https://127.0.0.1:5173` |
+| `COOKIE_SECURE` | `true` for the HTTPS website and its API proxy. |
 | `APP_TIMEZONE` | `Asia/Kuala_Lumpur` |
 | `WEATHER_API_KEY` | Optional OpenWeatherMap key for current weather. |
 | `PEXELS_API_KEY` | Optional Pexels key for destination photos. |
@@ -82,13 +83,37 @@ The filename must be exactly `.env`, not `.env.txt`. The server loads `backend/.
 
 The real `.env` is ignored by Git. Commit `.env.example` with placeholders. Provider keys belong in the backend environment file. Planning still works without weather and photo keys, and destinations can be entered manually when location search is unavailable.
 
-No `frontend/.env` is needed for normal local setup. Vite forwards `/api` requests to `http://127.0.0.1:5000`.
+No `frontend/.env` is needed for normal local setup. The browser uses HTTPS for both website and `/api` requests. Vite forwards `/api` to the backend at `http://127.0.0.1:5000` on the same computer. Direct access to that backend port still uses HTTP.
 
 ### MongoDB Atlas access
 
 In the Atlas project, add the computer's public IP under **Network Access / IP Access List**. Check that the database username and password in `MONGO_URI` are correct. All computers using the same database connection share the same data.
 
 ## 4. Start the application
+
+### Create local HTTPS certificates once per computer
+
+Install mkcert using its [official Windows instructions or release binaries](https://github.com/FiloSottile/mkcert#installation). When using the Windows x64 binary, rename it to `mkcert.exe`. Keep the program outside the project folder.
+
+From the main project folder, run:
+
+```bash
+mkcert -install
+mkcert -cert-file localhost+2.pem -key-file localhost+2-key.pem localhost 127.0.0.1 ::1
+```
+
+`mkcert -install` adds a local development certificate authority to the computer's trust store. Each developer generates their own certificates. The two project certificate files are ignored by Git. Keep the mkcert CA private key outside the repository and private to this computer.
+
+If `mkcert.exe` is not on PATH, use its full path instead. For example, in Command Prompt, if it was saved in Downloads:
+
+```bat
+"%USERPROFILE%\Downloads\mkcert.exe" -install
+"%USERPROFILE%\Downloads\mkcert.exe" -cert-file localhost+2.pem -key-file localhost+2-key.pem localhost 127.0.0.1 ::1
+```
+
+Certificate paths are resolved from the configuration file, so commands work from either the main folder or `frontend`. Both development and preview servers require certificates. A production build creates static files and does not need these local keys.
+
+### Run both services
 
 From the main project folder:
 
@@ -98,11 +123,12 @@ npm run dev
 
 | Service | Address |
 | --- | --- |
-| Website | http://127.0.0.1:5173 |
-| Backend API | http://127.0.0.1:5000 |
+| Website | https://127.0.0.1:5173 |
+| API through the HTTPS website proxy | https://127.0.0.1:5173/api |
+| Backend listener on this computer | http://127.0.0.1:5000 |
 | Database health check | http://127.0.0.1:5000/api/health |
 
-Open **http://127.0.0.1:5173** in your browser. Keep the terminal running. Press **Ctrl+C** to stop both services.
+Open **https://127.0.0.1:5173** in your browser. Keep the terminal running. Press **Ctrl+C** to stop both services.
 
 Use one hostname consistently when accessing the system. Restart the backend after changing its environment settings.
 
@@ -138,11 +164,11 @@ The command leaves an existing administrator's password and status unchanged. It
 - Logout, password changes and account suspension invalidate earlier sessions for that account on all devices, including Postman.
 - Authentication uses an HttpOnly cookie. Old Bearer tokens are unsupported. After updating an older checkout, refresh the website and sign in again.
 
-These instructions use local HTTP. HTTPS deployment requires certificates, HTTPS website origins and secure cookies. Set `COOKIE_SECURE=true` when HTTPS is configured. Production mode requires secure cookies and HTTPS origins.
+Local browser traffic uses Vite HTTPS with secure, HttpOnly cookies. Cookie names use the `__Host-` prefix, `Path=/` and `SameSite=Lax`. The API listener itself still uses HTTP, so use the HTTPS proxy address for authenticated local requests. This configuration covers local development. Production deployment requires its own HTTPS server or reverse proxy and trusted certificates.
 
 ## Postman setup
 
-Use `http://127.0.0.1:5000/api` as the base address.
+Use **`https://127.0.0.1:5173/api`** as the base address, with both services running. Secure cookies require HTTPS. Keep certificate verification enabled. If Postman does not trust the local CA, add the public `rootCA.pem` from the folder shown by `mkcert -CAROOT` under its CA certificate settings.
 
 1. Set each request's **Authorization** to **No Auth**. Under **Settings**, leave **Disable cookie jar** switched **off**. Remove manually entered `Cookie` headers.
 2. Send `GET /auth/csrf`. Copy the returned `csrfToken`. Postman stores the nonce cookie automatically.
@@ -183,6 +209,9 @@ The demo uses temporary data rather than the configured Atlas database. These de
 | Missing `MONGO_URI` or `JWT_SECRET` | Put the configured file at `backend/.env`, check the filename and restart the backend. |
 | MongoDB connection fails | Check the connection string, database credentials and Atlas IP access entry. |
 | Port `5000` or `5173` is occupied | Stop the earlier project terminal with Ctrl+C before starting another copy. |
+| Local HTTPS certificates are missing | Generate the two PEM files in the main project folder using the mkcert steps above. |
+| Browser reports an untrusted certificate | Install this computer's mkcert CA, regenerate its local certificate and restart the browser. |
+| Login reports that the origin is not allowed | Set `FRONTEND_URL=https://127.0.0.1:5173` in `backend/.env` and restart the backend. |
 | Admin setup reports `Email must contain 1–254 characters` | Set the admin variables in `backend/.env`, rather than only `.env.example`. |
 | Admin setup finds an ordinary account | Use an unused email for initial setup, or change the account's role through an existing administrator. |
 | Login reports a temporary lock | Wait for the displayed remaining time. Page refresh and backend restart do not remove the stored lock. |
