@@ -1,379 +1,616 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import useResource from "../hooks/useResource";
+import * as service from "../services/adminService";
+import { errorMessage } from "../services/api";
 import {
-  getStats, getUsers, updateUser, deleteUser,
-  getAllTrips, deleteAnyTrip,
-  getAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement,
-  getAllFeedback, updateFeedback, deleteFeedback,
-} from "../services/adminService";
-
-const TABS = ["Overview", "Users", "Trips", "Announcements", "Feedback"];
-
-export default function AdminPage() {
-  const [tab, setTab] = useState("Overview");
-
+  ConfirmAction,
+  Empty,
+  Loading,
+  Notice,
+  PageTitle,
+} from "../components/UI";
+import { formatDate } from "../utils/dates";
+const pageDetails = {
+  Overview: [
+    "Admin dashboard",
+    "An overview of accounts, trips and community feedback.",
+  ],
+  Users: ["User management", "Manage accounts, roles and account status."],
+  Trips: [
+    "Trip management",
+    "Review travelers’ trip records and remove records when needed.",
+  ],
+  Announcements: [
+    "Announcements",
+    "Create and manage messages shown to travelers.",
+  ],
+  Feedback: [
+    "Feedback management",
+    "Review feedback, respond to travelers and manage conversation status.",
+  ],
+};
+export default function AdminPage({ section = "Overview" }) {
+  const [params] = useSearchParams();
+  const legacy = Object.keys(pageDetails).find(
+    (value) => value.toLowerCase() === params.get("tab"),
+  );
+  if (section === "Overview" && legacy && legacy !== "Overview")
+    return <Navigate to={"/admin/" + legacy.toLowerCase()} replace />;
+  const [title, description] = pageDetails[section];
   return (
-    <div>
-      <h2>Admin Panel</h2>
-      <div style={{ display: "flex", gap: 8, margin: "15px 0 20px", flexWrap: "wrap" }}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "9px 18px",
-              borderRadius: 8,
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-              background: tab === t ? "#2563eb" : "#e2e8f0",
-              color: tab === t ? "white" : "#0f172a",
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {tab === "Overview" && <Overview />}
-      {tab === "Users" && <Users />}
-      {tab === "Trips" && <Trips />}
-      {tab === "Announcements" && <Announcements />}
-      {tab === "Feedback" && <FeedbackAdmin />}
-    </div>
+    <>
+      <PageTitle eyebrow="ADMIN PORTAL" title={title}>
+        {description}
+      </PageTitle>
+      {section === "Overview" && <Overview />}
+      {section === "Users" && <Users />}
+      {section === "Trips" && <Trips />}
+      {section === "Announcements" && <Announcements />}
+      {section === "Feedback" && <Feedback />}
+    </>
   );
 }
-
-/* ---------------- OVERVIEW ---------------- */
+function Retry({ error, reload }) {
+  return error ? (
+    <>
+      <Notice>{error}</Notice>
+      <button className="button secondary" onClick={reload}>
+        Try again
+      </button>
+    </>
+  ) : null;
+}
 function Overview() {
-  const [s, setS] = useState(null);
-
-  useEffect(() => {
-    getStats().then(setS).catch(console.error);
-  }, []);
-
-  if (!s) return <p>Loading...</p>;
-
+  const { data, loading, error, reload } = useResource(service.getStats, null);
+  if (loading) return <Loading>Loading overview…</Loading>;
+  if (error) return <Retry error={error} reload={reload} />;
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 15 }}>
-        <Stat label="Total Users" value={s.totalUsers} />
-        <Stat label="New (7 days)" value={s.newUsers} />
-        <Stat label="Suspended" value={s.suspendedUsers} />
-        <Stat label="Total Trips" value={s.totalTrips} />
-        <Stat label="Upcoming Trips" value={s.upcomingTrips} />
-        <Stat label="Favorites Saved" value={s.totalFavorites} />
-        <Stat label="Open Feedback" value={s.openFeedback} />
-      </div>
-
-      <div style={{ ...box, marginTop: 20, maxWidth: 420 }}>
-        <h3 style={{ marginBottom: 10 }}>Top Destinations</h3>
-        {s.topDestinations.length === 0 && <p style={{ color: "gray" }}>No trips yet.</p>}
-        {s.topDestinations.map((d, i) => (
-          <div key={d.destination} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-            <span>{i + 1}. {d.destination}</span>
-            <strong>{d.count}</strong>
+    <>
+      <div className="stats-grid">
+        {[
+          ["Total accounts", data.totalUsers],
+          ["New accounts · 7 days", data.newUsers],
+          ["Suspended accounts", data.suspendedUsers],
+          ["Total trips", data.totalTrips],
+          ["Upcoming trips", data.upcomingTrips],
+          ["Saved destinations", data.totalFavorites],
+          ["Open feedback", data.openFeedback],
+        ].map(([label, value]) => (
+          <div className="stat-card" key={label}>
+            <p>{label}</p>
+            <strong>{value}</strong>
           </div>
         ))}
       </div>
-    </div>
+      <section className="panel">
+        <h2>Popular destinations</h2>
+        {data.topDestinations.length ? (
+          <ol className="destination-ranking">
+            {data.topDestinations.map((item) => (
+              <li key={item.destination}>
+                <span>{item.destination}</span>
+                <strong>{item.count} trips</strong>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="muted">
+            Destinations will appear as people create trips.
+          </p>
+        )}
+      </section>
+    </>
   );
 }
-
-function Stat({ label, value }) {
+function Search({ value, setValue, onSearch, label }) {
   return (
-    <div style={{ background: "#BFF8F8", padding: 18, borderRadius: 14 }}>
-      <p style={{ fontSize: 13 }}>{label}</p>
-      <h2 style={{ margin: 0, fontSize: 30 }}>{value}</h2>
-    </div>
-  );
-}
-
-/* ---------------- USERS ---------------- */
-function Users() {
-  const [users, setUsers] = useState([]);
-  const [q, setQ] = useState("");
-  const me = JSON.parse(localStorage.getItem("user") || "{}");
-
-  const load = (query = q) => getUsers(query).then(setUsers).catch(console.error);
-
-  useEffect(() => {
-    load("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const change = async (u, data) => {
-    try {
-      const updated = await updateUser(u._id, data);
-      setUsers(users.map((x) => (x._id === u._id ? { ...x, ...updated } : x)));
-    } catch (err) {
-      alert(err.response?.data?.message || "Update failed");
-    }
-  };
-
-  const remove = async (u) => {
-    if (!window.confirm(`Delete ${u.email} and ALL their trips, checklists and favorites?`)) return;
-    try {
-      await deleteUser(u._id);
-      setUsers(users.filter((x) => x._id !== u._id));
-    } catch (err) {
-      alert(err.response?.data?.message || "Delete failed");
-    }
-  };
-
-  return (
-    <div style={box}>
-      <SearchBar value={q} onChange={setQ} onSearch={() => load()} placeholder="Search username or email" />
-      <Table head={["Username", "Email", "Role", "Trips", "Joined", "Status", "Actions"]}>
-        {users.map((u) => {
-          const isMe = u._id === me.id;
-          return (
-            <tr key={u._id}>
-              <td>{u.username}{isMe && " (you)"}</td>
-              <td>{u.email}</td>
-              <td>{u.role}</td>
-              <td>{u.tripCount}</td>
-              <td>{new Date(u.createdAt).toLocaleDateString()}</td>
-              <td style={{ color: u.isActive === false ? "#dc2626" : "#16a34a", fontWeight: 600 }}>
-                {u.isActive === false ? "Suspended" : "Active"}
-              </td>
-              <td>
-                {!isMe && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <Small onClick={() => change(u, { role: u.role === "admin" ? "user" : "admin" })}>
-                      {u.role === "admin" ? "Make user" : "Make admin"}
-                    </Small>
-                    <Small onClick={() => change(u, { isActive: u.isActive === false })}>
-                      {u.isActive === false ? "Reactivate" : "Suspend"}
-                    </Small>
-                    <Small danger onClick={() => remove(u)}>Delete</Small>
-                  </div>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </Table>
-    </div>
-  );
-}
-
-/* ---------------- TRIPS ---------------- */
-function Trips() {
-  const [trips, setTrips] = useState([]);
-  const [q, setQ] = useState("");
-
-  const load = (query = q) => getAllTrips(query).then(setTrips).catch(console.error);
-
-  useEffect(() => {
-    load("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const remove = async (t) => {
-    if (!window.confirm(`Delete trip to ${t.destination}?`)) return;
-    try {
-      await deleteAnyTrip(t._id);
-      setTrips(trips.filter((x) => x._id !== t._id));
-    } catch (err) {
-      alert(err.response?.data?.message || "Delete failed");
-    }
-  };
-
-  return (
-    <div style={box}>
-      <SearchBar value={q} onChange={setQ} onSearch={() => load()} placeholder="Search destination" />
-      <Table head={["Destination", "User", "Dates", "Budget (RM)", "Actions"]}>
-        {trips.map((t) => (
-          <tr key={t._id}>
-            <td>{t.destination}</td>
-            <td>{t.userId?.username || "(deleted user)"}</td>
-            <td>{new Date(t.startDate).toLocaleDateString()} → {new Date(t.endDate).toLocaleDateString()}</td>
-            <td>{t.budget}</td>
-            <td><Small danger onClick={() => remove(t)}>Delete</Small></td>
-          </tr>
-        ))}
-      </Table>
-    </div>
-  );
-}
-
-/* ---------------- ANNOUNCEMENTS ---------------- */
-function Announcements() {
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ title: "", message: "", type: "info" });
-
-  useEffect(() => {
-    getAnnouncements().then(setItems).catch(console.error);
-  }, []);
-
-  const add = async (e) => {
-    e.preventDefault();
-    try {
-      const created = await createAnnouncement(form);
-      setItems([created, ...items]);
-      setForm({ title: "", message: "", type: "info" });
-    } catch (err) {
-      alert(err.response?.data?.message || "Could not create");
-    }
-  };
-
-  const toggle = async (a) => {
-    const updated = await updateAnnouncement(a._id, { isActive: !a.isActive });
-    setItems(items.map((x) => (x._id === a._id ? updated : x)));
-  };
-
-  const remove = async (a) => {
-    if (!window.confirm("Delete this announcement?")) return;
-    await deleteAnnouncement(a._id);
-    setItems(items.filter((x) => x._id !== a._id));
-  };
-
-  return (
-    <div>
-      <form onSubmit={add} style={{ ...box, display: "flex", flexDirection: "column", gap: 10, maxWidth: 600 }}>
-        <h3>New Announcement</h3>
-        <input
-          placeholder="Title" required style={input}
-          value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
-        <textarea
-          placeholder="Message shown to all users on their dashboard" required rows={3} style={input}
-          value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })}
-        />
-        <select style={input} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-          <option value="info">Info</option>
-          <option value="success">Success</option>
-          <option value="warning">Warning</option>
-        </select>
-        <button type="submit" style={btn}>Publish</button>
-      </form>
-
-      <div style={{ ...box, marginTop: 20 }}>
-        <Table head={["Title", "Message", "Type", "Visible", "Actions"]}>
-          {items.map((a) => (
-            <tr key={a._id}>
-              <td>{a.title}</td>
-              <td>{a.message}</td>
-              <td>{a.type}</td>
-              <td>{a.isActive ? "Yes" : "Hidden"}</td>
-              <td>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Small onClick={() => toggle(a)}>{a.isActive ? "Hide" : "Show"}</Small>
-                  <Small danger onClick={() => remove(a)}>Delete</Small>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- FEEDBACK ---------------- */
-function FeedbackAdmin() {
-  const [items, setItems] = useState([]);
-  const [replies, setReplies] = useState({});
-
-  useEffect(() => {
-    getAllFeedback().then(setItems).catch(console.error);
-  }, []);
-
-  const save = async (f, status) => {
-    const reply = replies[f._id] ?? f.adminReply;
-    try {
-      const updated = await updateFeedback(f._id, { status: status || f.status, adminReply: reply });
-      setItems(items.map((x) => (x._id === f._id ? updated : x)));
-    } catch (err) {
-      alert(err.response?.data?.message || "Update failed");
-    }
-  };
-
-  const remove = async (f) => {
-    if (!window.confirm("Delete this feedback?")) return;
-    await deleteFeedback(f._id);
-    setItems(items.filter((x) => x._id !== f._id));
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {items.length === 0 && <p style={{ color: "gray" }}>No feedback yet.</p>}
-      {items.map((f) => (
-        <div key={f._id} style={box}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <strong>[{f.category}] {f.subject}</strong>
-            <span style={{ fontSize: 13, color: "gray" }}>
-              {f.userId?.username || "(deleted user)"} · {new Date(f.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-          <p style={{ margin: "8px 0", fontSize: 14 }}>{f.message}</p>
-          <textarea
-            rows={2} placeholder="Write a reply (visible to the user)" style={input}
-            defaultValue={f.adminReply}
-            onChange={(e) => setReplies({ ...replies, [f._id]: e.target.value })}
-          />
-          <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 13 }}>Status: <strong>{f.status}</strong></span>
-            <Small onClick={() => save(f, "reviewed")}>Mark reviewed</Small>
-            <Small onClick={() => save(f, "resolved")}>Mark resolved</Small>
-            <Small onClick={() => save(f)}>Save reply</Small>
-            <Small danger onClick={() => remove(f)}>Delete</Small>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ---------------- shared bits ---------------- */
-function SearchBar({ value, onChange, onSearch, placeholder }) {
-  return (
-    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-      <input
-        value={value} placeholder={placeholder} style={{ ...input, maxWidth: 320 }}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onSearch()}
-      />
-      <button style={btn} onClick={onSearch}>Search</button>
-    </div>
-  );
-}
-
-function Table({ head, children }) {
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-        <thead>
-          <tr>{head.map((h) => <th key={h} style={th}>{h}</th>)}</tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-      <style>{`td { padding: 10px 8px; border-top: 1px solid #e5e7eb; vertical-align: top; }`}</style>
-    </div>
-  );
-}
-
-function Small({ children, onClick, danger }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "5px 10px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
-        background: danger ? "#fee2e2" : "#e2e8f0", color: danger ? "#b91c1c" : "#0f172a",
+    <form
+      className="inline-form admin-search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSearch();
       }}
     >
-      {children}
-    </button>
+      <label className="grow">
+        {label}
+        <input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          maxLength={100}
+          placeholder={label}
+        />
+      </label>
+      <button className="button secondary">Search</button>
+    </form>
   );
 }
-
-const box = { background: "white", padding: 20, borderRadius: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" };
-const th = { textAlign: "left", padding: "8px", fontSize: 13, color: "#475569" };
-const input = {
-  width: "100%", padding: 10, borderRadius: 8, border: "1px solid #d1d5db",
-  fontSize: 14, boxSizing: "border-box", fontFamily: "inherit",
-};
-const btn = {
-  padding: "10px 18px", background: "#2563eb", color: "white", border: "none",
-  borderRadius: 8, fontWeight: "bold", cursor: "pointer",
-};
+function Users() {
+  const { user: me } = useAuth();
+  const [query, setQuery] = useState("");
+  const [draft, setDraft] = useState("");
+  const load = useCallback(() => service.getUsers(query), [query]);
+  const { data, loading, error, reload } = useResource(load);
+  const change = async (item, update) => {
+    await service.updateUser(item._id, update);
+    reload();
+  };
+  return (
+    <section className="panel">
+      <Search
+        value={draft}
+        setValue={setDraft}
+        label="Search accounts by name or email"
+        onSearch={() => {
+          setQuery(draft.trim());
+          if (query === draft.trim()) reload();
+        }}
+      />
+      <Retry error={error} reload={reload} />
+      {loading ? (
+        <Loading>Loading accounts…</Loading>
+      ) : !data.length ? (
+        <Empty title="No matching accounts">
+          Try another name or email address.
+        </Empty>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <caption className="sr-only">User account management</caption>
+            <thead>
+              <tr>
+                {[
+                  "Account",
+                  "Role",
+                  "Trips",
+                  "Joined",
+                  "Status",
+                  "Actions",
+                ].map((label) => (
+                  <th key={label}>{label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item._id}>
+                  <td>
+                    <strong>
+                      {item.username}
+                      {item._id === me.id ? " (you)" : ""}
+                    </strong>
+                    <small>{item.email}</small>
+                  </td>
+                  <td>{item.role}</td>
+                  <td>{item.tripCount}</td>
+                  <td>{formatDate(item.createdAt)}</td>
+                  <td>
+                    <span
+                      className={`badge ${item.isActive ? "active" : "warning"}`}
+                    >
+                      {item.isActive ? "Active" : "Suspended"}
+                    </span>
+                  </td>
+                  <td>
+                    {item._id === me.id ? (
+                      <span className="muted">Your account</span>
+                    ) : (
+                      <div className="actions wrap">
+                        <ConfirmAction
+                          label={
+                            item.role === "admin" ? "Make user" : "Make admin"
+                          }
+                          title="Change account role?"
+                          className="button secondary small"
+                          onConfirm={() =>
+                            change(item, {
+                              role: item.role === "admin" ? "user" : "admin",
+                            })
+                          }
+                        >
+                          Change the permissions for {item.email}.
+                        </ConfirmAction>
+                        <ConfirmAction
+                          label={item.isActive ? "Suspend" : "Reactivate"}
+                          title={
+                            item.isActive
+                              ? "Suspend this account?"
+                              : "Reactivate this account?"
+                          }
+                          className="button secondary small"
+                          onConfirm={() =>
+                            change(item, { isActive: !item.isActive })
+                          }
+                        >
+                          {item.isActive
+                            ? "This user will be unable to access their account until reactivated."
+                            : "This user will be able to log in again."}
+                        </ConfirmAction>
+                        <ConfirmAction
+                          label="Delete user"
+                          title="Permanently delete this user?"
+                          className="button ghost-danger small"
+                          onConfirm={async () => {
+                            await service.deleteUser(item._id);
+                            reload();
+                          }}
+                        >
+                          All travel data belonging to {item.email} will also be
+                          deleted.
+                        </ConfirmAction>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+function Trips() {
+  const [query, setQuery] = useState("");
+  const [draft, setDraft] = useState("");
+  const load = useCallback(() => service.getAllTrips(query), [query]);
+  const { data, loading, error, reload } = useResource(load);
+  return (
+    <section className="panel">
+      <Search
+        value={draft}
+        setValue={setDraft}
+        label="Search trips by destination"
+        onSearch={() => {
+          setQuery(draft.trim());
+          if (query === draft.trim()) reload();
+        }}
+      />
+      <Retry error={error} reload={reload} />
+      {loading ? (
+        <Loading>Loading trips…</Loading>
+      ) : !data.length ? (
+        <Empty title="No matching trips">Try another destination.</Empty>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <caption className="sr-only">All users’ trips</caption>
+            <thead>
+              <tr>
+                {["Destination", "Traveler", "Dates", "Actions"].map(
+                  (label) => (
+                    <th key={label}>{label}</th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item) => (
+                <tr key={item._id}>
+                  <td>
+                    <strong>{item.destination}</strong>
+                  </td>
+                  <td>
+                    {item.userId?.username || "Deleted account"}
+                    <small>{item.userId?.email}</small>
+                  </td>
+                  <td>
+                    {formatDate(item.startDate)}
+                    <small>to {formatDate(item.endDate)}</small>
+                  </td>
+                  <td>
+                    <ConfirmAction
+                      label="Delete trip"
+                      title={`Delete ${item.destination}?`}
+                      className="button ghost-danger small"
+                      onConfirm={async () => {
+                        await service.deleteAnyTrip(item._id);
+                        reload();
+                      }}
+                    >
+                      This permanently removes the trip, itinerary and
+                      checklist.
+                    </ConfirmAction>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+function Announcements() {
+  const { data, loading, error, reload } = useResource(
+    service.getAnnouncements,
+  );
+  const [editing, setEditing] = useState(null);
+  const [message, setMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+  const toggle = async (item) => {
+    setActionError("");
+    try {
+      await service.updateAnnouncement(item._id, { isActive: !item.isActive });
+      reload();
+    } catch (failure) {
+      setActionError(errorMessage(failure));
+    }
+  };
+  return (
+    <div className="feedback-grid">
+      <AnnouncementForm
+        key={editing?._id || "new"}
+        item={editing}
+        cancel={() => setEditing(null)}
+        saved={() => {
+          setMessage(
+            editing ? "Announcement updated." : "Announcement created.",
+          );
+          setEditing(null);
+          reload();
+        }}
+      />
+      <section>
+        <div className="section-heading">
+          <h2>Announcements</h2>
+          <button className="button secondary small" onClick={reload}>
+            Refresh
+          </button>
+        </div>
+        <Notice type="success">{message}</Notice>
+        <Notice>{actionError}</Notice>
+        <Retry error={error} reload={reload} />
+        {loading ? (
+          <Loading>Loading announcements…</Loading>
+        ) : !data.length ? (
+          <Empty title="A clear line to your travelers">
+            Create an announcement to show a message on their dashboards.
+          </Empty>
+        ) : (
+          <div className="form-stack">
+            {data.map((item) => (
+              <article className="panel" key={item._id}>
+                <div className="section-heading">
+                  <span
+                    className={`badge ${item.isActive ? "active" : "completed"}`}
+                  >
+                    {item.isActive ? "Visible" : "Hidden"}
+                  </span>
+                  <span className="muted">{item.type}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <p className="preserve-lines">{item.message}</p>
+                <div className="actions wrap">
+                  <button
+                    className="button secondary small"
+                    onClick={() => setEditing(item)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="button secondary small"
+                    onClick={() => toggle(item)}
+                  >
+                    {item.isActive ? "Hide" : "Publish"}
+                  </button>
+                  <ConfirmAction
+                    label="Delete announcement"
+                    title="Delete this announcement?"
+                    className="button ghost-danger small"
+                    onConfirm={async () => {
+                      await service.deleteAnnouncement(item._id);
+                      if (editing?._id === item._id) setEditing(null);
+                      reload();
+                    }}
+                  >
+                    This message will be permanently removed.
+                  </ConfirmAction>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function AnnouncementForm({ item, cancel, saved }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setPending(true);
+    setError("");
+    const payload = {
+      title: data.get("title"),
+      message: data.get("message"),
+      type: data.get("type"),
+      isActive: data.get("isActive") === "on",
+    };
+    try {
+      if (item) await service.updateAnnouncement(item._id, payload);
+      else await service.createAnnouncement(payload);
+      form.reset();
+      saved();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <form className="panel form-stack" onSubmit={submit}>
+      <h2>{item ? "Edit announcement" : "New announcement"}</h2>
+      <Notice>{error}</Notice>
+      <label>
+        Title
+        <input
+          name="title"
+          defaultValue={item?.title || ""}
+          maxLength={120}
+          required
+        />
+      </label>
+      <label>
+        Message
+        <textarea
+          name="message"
+          defaultValue={item?.message || ""}
+          rows={5}
+          maxLength={2000}
+          required
+        />
+      </label>
+      <label>
+        Style
+        <select name="type" defaultValue={item?.type || "info"}>
+          <option value="info">Information</option>
+          <option value="success">Good news</option>
+          <option value="warning">Important notice</option>
+        </select>
+      </label>
+      <label className="checkbox-label">
+        <input
+          name="isActive"
+          type="checkbox"
+          defaultChecked={item?.isActive ?? true}
+        />
+        Show on travelers’ dashboards
+      </label>
+      <div className="actions">
+        <button className="button" disabled={pending}>
+          {pending
+            ? "Saving…"
+            : item
+              ? "Save announcement"
+              : "Create announcement"}
+        </button>
+        {item && (
+          <button
+            type="button"
+            className="button secondary"
+            disabled={pending}
+            onClick={cancel}
+          >
+            Cancel editing
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+function Feedback() {
+  const [status, setStatus] = useState("");
+  const load = useCallback(() => service.getAllFeedback(status), [status]);
+  const { data, loading, error, reload } = useResource(load);
+  return (
+    <>
+      <div className="list-toolbar">
+        <h2>Community feedback</h2>
+        <label>
+          Status
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
+      </div>
+      <Retry error={error} reload={reload} />
+      {loading ? (
+        <Loading>Loading feedback…</Loading>
+      ) : !data.length ? (
+        <Empty title="You’re all caught up">
+          There are no messages matching this status.
+        </Empty>
+      ) : (
+        <div className="form-stack">
+          {data.map((item) => (
+            <FeedbackItem
+              key={`${item._id}-${item.updatedAt}`}
+              item={item}
+              reload={reload}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+function FeedbackItem({ item, reload }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setPending(true);
+    setError("");
+    try {
+      await service.updateFeedback(item._id, Object.fromEntries(data));
+      reload();
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <article className="panel">
+      <div className="section-heading">
+        <span className="eyebrow">
+          {item.category} · {formatDate(item.createdAt)}
+        </span>
+        <span className={`badge ${item.status}`}>{item.status}</span>
+      </div>
+      <h3>{item.subject}</h3>
+      <p className="muted">
+        From {item.userId?.username || "Deleted account"} · {item.userId?.email}
+      </p>
+      <p className="preserve-lines">{item.message}</p>
+      <form className="form-stack" onSubmit={submit}>
+        <Notice>{error}</Notice>
+        <label>
+          Admin response
+          <textarea
+            name="adminReply"
+            defaultValue={item.adminReply}
+            rows={3}
+            maxLength={2000}
+          />
+        </label>
+        <label>
+          Feedback status
+          <select name="status" defaultValue={item.status}>
+            <option value="open">Open</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
+        <div className="actions wrap">
+          <button className="button" disabled={pending}>
+            {pending ? "Saving…" : "Save response"}
+          </button>
+          <ConfirmAction
+            label="Delete feedback"
+            title="Delete this feedback?"
+            className="button ghost-danger"
+            onConfirm={async () => {
+              await service.deleteFeedback(item._id);
+              reload();
+            }}
+          >
+            The traveler will no longer see this conversation.
+          </ConfirmAction>
+        </div>
+      </form>
+    </article>
+  );
+}

@@ -1,241 +1,164 @@
-import { FaSearch, FaBell } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  FaArrowRight,
+  FaMapMarkedAlt,
+  FaSuitcase,
+  FaWallet,
+  FaCalendarAlt,
+} from "react-icons/fa";
+import { useAuth } from "../hooks/useAuth";
+import useResource from "../hooks/useResource";
 import { getTrips } from "../services/tripService";
-import { useNavigate } from "react-router-dom";
-import { getImageForDestination } from "../services/pexelsService";
 import { getActiveAnnouncements } from "../services/feedbackService";
+import { Empty, Loading, Notice, PageTitle } from "../components/UI";
+import TripCover from "../components/TripCover";
+import { formatDate, money, tripStatus, duration } from "../utils/dates";
 
 export default function DashboardPage() {
-  const user = JSON.parse(localStorage.getItem("user"));
-  const navigate = useNavigate();
-  const [trips, setTrips] = useState([]);
-  const [nextTripImage, setNextTripImage] = useState("");
-  const [loadingImage, setLoadingImage] = useState(true);
-  const [imageError, setImageError] = useState(false);
-  const [announcements, setAnnouncements] = useState([]);
-
-  useEffect(() => {
-    loadTrips();
-    getActiveAnnouncements().then(setAnnouncements).catch(() => {});
-  }, []);
-
-  const loadTrips = async () => {
-    try {
-      const data = await getTrips();
-      setTrips(data?.trips || data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // STATS
-  const totalTrips = trips.length;
-  const upcomingTrips = trips.filter(
-    (t) => new Date(t.startDate) > new Date()
-  ).length;
-  const totalBudget = trips.reduce(
-    (sum, t) => sum + (Number(t.budget) || 0),
-    0
-  );
-
-  // NEXT TRIP
-  const nextTrip = [...trips]
-    .filter((t) => new Date(t.startDate) >= new Date())
-    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
-
-  // Fetch image for the next trip's destination
-  useEffect(() => {
-    const fetchNextTripImage = async () => {
-      if (nextTrip?.destination) {
-        setLoadingImage(true);
-        setImageError(false);
-        try {
-          const imageUrl = await getImageForDestination(nextTrip.destination);
-          setNextTripImage(imageUrl);
-        } catch (err) {
-          setImageError(true);
-          setNextTripImage("");
-        } finally {
-          setLoadingImage(false);
-        }
-      } else {
-        setNextTripImage("");
-        setLoadingImage(false);
-        setImageError(false);
-      }
-    };
-    fetchNextTripImage();
-  }, [nextTrip]);
-
-  // RECENT
-  const recentTrips = [...trips]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 2);
-
+  const { user } = useAuth();
+  const { data: trips, loading, error, reload } = useResource(getTrips);
+  const announcements = useResource(getActiveAnnouncements);
+  if (loading) return <Loading />;
+  const nextTrip = trips
+    .filter((trip) => tripStatus(trip) !== "Completed")
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+  const recent = [...trips]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 4);
+  const stats = [
+    [FaSuitcase, "Your trips", trips.length],
+    [
+      FaCalendarAlt,
+      "Upcoming trips",
+      trips.filter((trip) => tripStatus(trip) === "Upcoming").length,
+    ],
+    [
+      FaMapMarkedAlt,
+      "Destinations",
+      new Set(trips.map((trip) => trip.destination)).size,
+    ],
+    [
+      FaWallet,
+      "Planned budget",
+      money(trips.reduce((total, trip) => total + trip.budget, 0)),
+    ],
+  ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* HEADER */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}>
-        <h2>Smart Travel Planner</h2>
-        <div style={{ display: "flex", gap: "15px" }}>
-          <img
-            src="https://i.pravatar.cc/40"
-            alt="Profile"
-            onClick={() => navigate("/profile")}
-            style={{ width: 45, height: 45, borderRadius: "50%", cursor: "pointer", border: "2px solid #2563eb" }}
-          />
-        </div>
-      </div>
-
-      {/* GREETING */}
-      <div>
-        <h3>Welcome, {user?.username || "Explorer"}</h3>
-        <p style={{ color: "gray" }}>
-          Ready for your next adventure?
-        </p>
-      </div>
-
-      {/* ANNOUNCEMENTS FROM ADMIN */}
-      {announcements.map((a) => (
-        <div key={a._id} style={{
-          padding: "12px 16px",
-          borderRadius: "12px",
-          background: a.type === "warning" ? "#fef3c7" : a.type === "success" ? "#dcfce7" : "#dbeafe",
-          color: "#0f172a",
-        }}>
-          <strong>{a.title}</strong>
-          <p style={{ margin: "4px 0 0", fontSize: "14px" }}>{a.message}</p>
-        </div>
+    <>
+      <PageTitle
+        title={`Hello, ${user.username}.`}
+        action={
+          <Link className="button" to="/create-trip">
+            + Plan a trip
+          </Link>
+        }
+      >
+        A little overview of everywhere you’re going.
+      </PageTitle>
+      <Notice>{error}</Notice>
+      {error && (
+        <button className="button secondary" onClick={reload}>
+          Try again
+        </button>
+      )}
+      {announcements.data.map((item) => (
+        <Notice
+          key={item._id}
+          type={item.type === "warning" ? "warning" : "info"}
+        >
+          <strong>{item.title}</strong>
+          <p>{item.message}</p>
+        </Notice>
       ))}
-
-      {/* STATS CARDS */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "20px",
-      }}>
-        <StatCard title="Total Trips" value={totalTrips} />
-        <StatCard title="Upcoming" value={upcomingTrips} />
-        <StatCard title="Destinations" value={new Set(trips.map(t => t.destination)).size} />
+      <div className="stats-grid">
+        {stats.map(([Icon, label, value]) => (
+          <div className="stat-card" key={label}>
+            <span className="stat-icon">
+              <Icon />
+            </span>
+            <p>{label}</p>
+            <strong>{value}</strong>
+          </div>
+        ))}
       </div>
-
-      {/* BUDGET */}
-      <div style={{
-        padding: "20px",
-        background: "#002429",
-        color: "white",
-        borderRadius: "12px",
-      }}>
-        <h3>Total Budget</h3>
-        <h1>RM {totalBudget}</h1>
-      </div>
-
-      {/* BOTTOM SECTION */}
-      <div style={{ display: "flex", gap: "20px" }}>
-        {/* LEFT – Next Adventure (NO preset image) */}
-        <div style={{ flex: 2 }}>
-          <h3>Next Adventure</h3>
+      <div className="dashboard-grid">
+        <section>
+          <div className="section-heading">
+            <h2>Your next adventure</h2>
+            <Link to="/trips">
+              All trips <FaArrowRight />
+            </Link>
+          </div>
           {nextTrip ? (
-            <div style={{
-              position: "relative",
-              height: "320px",
-              borderRadius: "16px",
-              overflow: "hidden",
-              background: "#e5e7eb"
-            }}>
-              {loadingImage ? (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  background: "#f3f4f6",
-                  fontSize: "14px",
-                  color: "#6b7280"
-                }}>
-                  Loading travel photo...
-                </div>
-              ) : imageError ? (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  background: "#f3f4f6",
-                  fontSize: "14px",
-                  color: "#dc2626"
-                }}>
-                  ❌ Could not load image
-                </div>
-              ) : (
-                <img
-                  src={nextTripImage}
-                  alt={nextTrip.destination}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              )}
-              {/* Overlay (always visible) */}
-              <div style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                padding: "20px",
-                background: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)",
-                color: "white",
-              }}>
+            <article className="adventure-card">
+              <TripCover destination={nextTrip.destination} />
+              <div className="adventure-body">
+                <span className={`badge ${tripStatus(nextTrip).toLowerCase()}`}>
+                  {tripStatus(nextTrip)}
+                </span>
                 <h2>{nextTrip.destination}</h2>
                 <p>
-                  {new Date(nextTrip.startDate).toLocaleDateString()} →
-                  {new Date(nextTrip.endDate).toLocaleDateString()}
+                  <FaCalendarAlt /> {formatDate(nextTrip.startDate)} –{" "}
+                  {formatDate(nextTrip.endDate)} · {duration(nextTrip)} days
                 </p>
+                <div className="actions">
+                  <Link className="button" to={`/itinerary/${nextTrip._id}`}>
+                    Open itinerary <FaArrowRight />
+                  </Link>
+                  <Link
+                    className="button secondary"
+                    to={`/view-trip/${nextTrip._id}`}
+                  >
+                    Trip details
+                  </Link>
+                </div>
               </div>
+            </article>
+          ) : (
+            <Empty
+              title="Where will you go next?"
+              to="/create-trip"
+              action="Create your first trip"
+            >
+              A weekend away or a big adventure — give it a place to begin.
+            </Empty>
+          )}
+        </section>
+        <section className="panel">
+          <div className="section-heading">
+            <h2>Recently planned</h2>
+          </div>
+          {recent.length ? (
+            <div className="recent-list">
+              {recent.map((trip) => (
+                <Link key={trip._id} to={`/view-trip/${trip._id}`}>
+                  <span className="recent-icon">
+                    <FaMapMarkedAlt />
+                  </span>
+                  <span>
+                    <strong>{trip.destination}</strong>
+                    <small>
+                      {formatDate(trip.startDate)} · {money(trip.budget)}
+                    </small>
+                  </span>
+                  <FaArrowRight />
+                </Link>
+              ))}
             </div>
           ) : (
-            <p>No upcoming trips</p>
+            <p className="muted">Your recent plans will appear here.</p>
           )}
-        </div>
-
-        {/* RIGHT – Recent Activity */}
-        <div style={{ flex: 1 }}>
-          <h3>Recent Activity</h3>
-          {recentTrips.map((t) => (
-            <div key={t._id} style={{
-              background: "white",
-              padding: "12px",
-              borderRadius: "12px",
-              marginBottom: "10px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            }}>
-              <p style={{ fontWeight: "bold" }}>{t.destination}</p>
-              <p style={{ fontSize: "12px", color: "gray" }}>
-                Created: {new Date(t.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
-        </div>
+          <div className="tip-card">
+            <p className="eyebrow">A LITTLE TRAVEL TIP</p>
+            <h3>Make the details easy.</h3>
+            <p>
+              Add your packing tasks and daily stops before you leave. Future
+              you will thank you.
+            </p>
+            <Link to="/itinerary">Explore your itineraries →</Link>
+          </div>
+        </section>
       </div>
-    </div>
-  );
-}
-
-/* StatCard Component */
-function StatCard({ title, value }) {
-  return (
-    <div style={{
-      padding: "20px",
-      background: "#BFF8F8",
-      borderRadius: "16px",
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-      border: "1px solid #e9eef3",
-      textAlign: "left",
-    }}>
-      <p style={{ color: "#000000", fontSize: "14px", fontWeight: "500", marginBottom: "8px" }}>{title}</p>
-      <h2 style={{ margin: 0, fontSize: "32px", fontWeight: "bold", color: "#000000" }}>{value}</h2>
-    </div>
+    </>
   );
 }

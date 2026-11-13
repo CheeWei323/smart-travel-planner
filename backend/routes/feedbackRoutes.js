@@ -1,10 +1,15 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware");
-const { createFeedback, getMyFeedback, getActiveAnnouncements } = require("../controllers/feedbackController");
+const { protect, travelerOnly } = require("../middleware/authMiddleware");
+router.use(protect, travelerOnly);
+const {
+  createFeedback,
+  getMyFeedback,
+  getActiveAnnouncements,
+} = require("../controllers/feedbackController");
 
-router.post("/", protect, createFeedback);
-router.get("/mine", protect, getMyFeedback);
-router.get("/announcements", protect, getActiveAnnouncements);
+router.post("/", createFeedback);
+router.get("/mine", getMyFeedback);
+router.get("/announcements", getActiveAnnouncements);
 
 module.exports = router;

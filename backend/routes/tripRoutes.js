@@ -1,18 +1,21 @@
 const express = require("express");
-const { protect } = require("../middleware/authMiddleware"); 
+const { protect, travelerOnly } = require("../middleware/authMiddleware");
 const {
   createTrip,
   getTrips,
+  getTrip,
   deleteTrip,
   updateTrip,
 } = require("../controllers/tripController");
 
 const router = express.Router();
+router.use(protect, travelerOnly);
 
-// All endpoints are now protected and require a logged-in user token
-router.post("/", protect, createTrip);
-router.get("/", protect, getTrips);
-router.delete("/:id", protect, deleteTrip);
-router.put("/:id", protect, updateTrip);
+// Personal trip endpoints require an authenticated traveler account.
+router.post("/", createTrip);
+router.get("/", getTrips);
+router.get("/:id", getTrip);
+router.delete("/:id", deleteTrip);
+router.put("/:id", updateTrip);
 
 module.exports = router;

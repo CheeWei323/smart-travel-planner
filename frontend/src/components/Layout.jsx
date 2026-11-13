@@ -1,144 +1,98 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import {
+  FaCompass,
   FaHome,
   FaSuitcase,
   FaMap,
   FaPlus,
   FaSignOutAlt,
+  FaUser,
+  FaCommentAlt,
 } from "react-icons/fa";
+import { useAuth } from "../hooks/useAuth";
+import { Notice } from "./UI";
 
 export default function Layout() {
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    // Clear auth data
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    // Redirect to login page
-    navigate("/");
-  };
-
+  const { user, logout, logoutPending, logoutError } = useAuth();
+  const links = [
+    ["/dashboard", FaHome, "Dashboard"],
+    ["/trips", FaSuitcase, "My trips"],
+    ["/itinerary", FaMap, "Itinerary"],
+    ["/feedback", FaCommentAlt, "Help & feedback"],
+    ["/profile", FaUser, "Account settings"],
+  ];
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      
-      {/* Sidebar */}
-      <div
-        style={{
-          width: "240px",
-          background: "#0f172a",
-          color: "white",
-          padding: "20px",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Logo */}
-        <h2 
-          onClick={() => navigate("/dashboard")}
-          style={{ 
-            fontSize: "22px", 
-            marginBottom: "20px", 
-            cursor: "pointer", 
-            userSelect: "none" 
-          }}
-        >
-          TravelWise
-        </h2>
-
-        {/* Create Trip Button */}
-        <NavLink
-          to="/create-trip"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "10px",
-            background: "#2563eb",
-            color: "white",
-            textDecoration: "none",
-            padding: "12px",
-            borderRadius: "10px",
-            fontWeight: "600",
-            marginBottom: "25px",
-          }}
-        >
+    <div className="app-layout">
+      <aside className="sidebar">
+        <Link className="brand" to="/dashboard">
+          <span className="brand-icon">
+            <FaCompass />
+          </span>
+          <span>
+            TravelWise<small>MAKE ROOM FOR ADVENTURE</small>
+          </span>
+        </Link>
+        <Link className="button create-trip" to="/create-trip">
           <FaPlus />
-          Create Trip
-        </NavLink>
-
-        {/* Nav */}
-        <nav style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          
-          <NavLink
-            to="/dashboard"
-            style={({ isActive }) => ({
-              ...linkStyle,
-              background: isActive ? "#1e293b" : "transparent",
-            })}
-          >
-            <FaHome /> Dashboard
-          </NavLink>
-
-          <NavLink
-            to="/trips"
-            style={({ isActive }) => ({
-              ...linkStyle,
-              background: isActive ? "#1e293b" : "transparent",
-            })}
-          >
-            <FaSuitcase /> Trips
-          </NavLink>
-
-          <NavLink
-            to="/itinerary"
-            style={({ isActive }) => ({
-              ...linkStyle,
-              background: isActive ? "#1e293b" : "transparent",
-            })}
-          >
-            <FaMap /> Itinerary
-          </NavLink>
-
+          Create a trip
+        </Link>
+        <nav aria-label="Main navigation">
+          {links.map(([to, Icon, label]) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `nav-link ${isActive ? "active" : ""}`
+              }
+            >
+              <Icon />
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </nav>
-
-        {/* Logout Button pushed to the bottom */}
-        <div style={{ marginTop: "auto" }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              ...linkStyle,
-              width: "100%",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#ef4444", // Red color to indicate a destructive/exit action
-              fontSize: "15px",
-              fontFamily: "inherit",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          >
-            <FaSignOutAlt /> Logout
+        <div className="sidebar-bottom">
+          <div className="account-chip">
+            <span className="avatar">
+              {user.username.slice(0, 1).toUpperCase()}
+            </span>
+            <span>
+              <strong>{user.username}</strong>
+              <small>Your next adventure awaits</small>
+            </span>
+          </div>
+          <button className="nav-link logout" onClick={logout} disabled={logoutPending}>
+            <FaSignOutAlt />
+            {logoutPending ? "Logging out…" : "Log out"}
           </button>
         </div>
-      </div>
-
-      {/* Page Content */}
-      <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
-        <Outlet />
+      </aside>
+      <div className="main-shell">
+        <header className="topbar">
+          <span>Your plans. Your pace.</span>
+          <div className="actions">
+            <Link to="/profile" className="profile-link">
+              <span className="avatar small">
+                {user.username.slice(0, 1).toUpperCase()}
+              </span>
+              {user.username}
+            </Link>
+            <button
+              className="icon-button"
+              aria-label="Log out"
+              title="Log out"
+              onClick={logout}
+              disabled={logoutPending}
+            >
+              <FaSignOutAlt />
+            </button>
+          </div>
+        </header>
+        <main id="main-content">
+          <Notice>{logoutError}</Notice>
+          <Outlet />
+        </main>
+        <footer>TravelWise · A little planning. A lot of possibility.</footer>
       </div>
     </div>
   );
 }
-
-/* shared style */
-const linkStyle = {
-  color: "white",
-  textDecoration: "none",
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  fontSize: "15px",
-  padding: "10px",
-  borderRadius: "8px",
-};

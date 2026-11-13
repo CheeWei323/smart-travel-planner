@@ -1,36 +1,30 @@
 const Feedback = require("../models/Feedback");
 const Announcement = require("../models/Announcement");
-
-// USER: submit feedback / bug report
+const { fields, text, fail } = require("../utils/validation");
 const createFeedback = async (req, res) => {
-  try {
-    const { category, subject, message } = req.body;
-    if (!subject || !message) {
-      return res.status(400).json({ message: "Subject and message are required" });
-    }
-    const item = await Feedback.create({ userId: req.user.id, category, subject, message });
-    res.status(201).json(item);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, ["category", "subject", "message"]);
+  const category = req.body.category || "other";
+  if (!["bug", "suggestion", "other"].includes(category))
+    fail("Invalid feedback category");
+  res
+    .status(201)
+    .json(
+      await Feedback.create({
+        userId: req.user.id,
+        category,
+        subject: text(req.body.subject, "Subject", 120),
+        message: text(req.body.message, "Message", 2000),
+      }),
+    );
 };
-
-// USER: see own feedback and any admin reply
-const getMyFeedback = async (req, res) => {
-  try {
-    res.json(await Feedback.find({ userId: req.user.id }).sort({ createdAt: -1 }));
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// USER: active announcements (shown on the dashboard)
-const getActiveAnnouncements = async (req, res) => {
-  try {
-    res.json(await Announcement.find({ isActive: true }).sort({ createdAt: -1 }).limit(5));
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
+const getMyFeedback = async (req, res) =>
+  res.json(
+    await Feedback.find({ userId: req.user.id }).sort({ createdAt: -1 }),
+  );
+const getActiveAnnouncements = async (_req, res) =>
+  res.json(
+    await Announcement.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .limit(5),
+  );
 module.exports = { createFeedback, getMyFeedback, getActiveAnnouncements };

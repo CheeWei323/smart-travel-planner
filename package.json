@@ -4,10 +4,14 @@
   "description": "A full-stack travel planner application featuring a Node.js backend and a React frontend. This project includes user authentication with JWT, protected API routes, and integration with MongoDB for data management.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm test --prefix backend && npm test --prefix frontend",
     "frontend": "npm run dev --prefix frontend",
     "backend": "npm run dev --prefix backend",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "setup": "npm install && npm install --prefix backend && npm install --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "check": "npm test && npm run build",
+    "seed:admin": "npm run seed:admin --prefix backend"
   },
   "repository": {
     "type": "git",
@@ -25,4 +29,3 @@
     "concurrently": "^10.0.3"
   }
 }
-

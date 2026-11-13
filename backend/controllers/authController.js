@@ -1,7 +1,28 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const { createSession, sessionDetails, setSessionCookie, clearSessionCookie,
+  csrfDetails } = require("../utils/cookieSession");
+const {
+  SESSION_ENDED_MESSAGE,
+  validTokenVersion,
+  tokenVersionFilter,
+} = require("../utils/sessionSecurity");
 const { deleteUserAndData } = require("../utils/deleteUserData");
+const {
+  recordFailedLogin,
+  completeLogin,
+  getLoginLock,
+  LOGIN_FAILURE_MESSAGE,
+} = require("../utils/loginProtection");
+// Compare unknown accounts too, reducing the obvious account-existence timing gap.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("Local login timing placeholder", 10);
+const {
+  fields,
+  text,
+  email: validEmail,
+  password: validPassword,
+  fail,
+} = require("../utils/validation");
 
 const publicUser = (user) => ({
   id: user._id,
@@ -9,156 +30,137 @@ const publicUser = (user) => ({
   email: user.email,
   role: user.role,
 });
-
 const registerUser = async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const email = (req.body.email || "").trim().toLowerCase();
-
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "Username, email and password are required" });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
-    }
-
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // role is NOT taken from the request body - everyone registers as a normal user
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-    });
-
-    res.status(201).json({
-      message: "User registered successfully",
+  fields(req.body, ["username", "email", "password"]);
+  const username = text(req.body.username, "Username", 80);
+  const email = validEmail(req.body.email);
+  const password = validPassword(req.body.password);
+  if (await User.exists({ email })) fail("Email is already registered", 409);
+  const user = await User.create({
+    username,
+    email,
+    password: await bcrypt.hash(password, 10),
+  });
+  res
+    .status(201)
+    .json({
+      message: "Account created. You can now log in.",
       user: publicUser(user),
     });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
-
 const loginUser = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const email = (req.body.email || "").trim().toLowerCase();
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ message: "Your account has been suspended. Please contact an admin." });
-    }
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user: publicUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  fields(req.body, ["email", "password"]);
+  const email = validEmail(req.body.email);
+  if (
+    typeof req.body.password !== "string" ||
+    Buffer.byteLength(req.body.password, "utf8") > 72
+  )
+    fail(LOGIN_FAILURE_MESSAGE, 401);
+  const user = await User.findOne({ email }).select("+tokenVersion");
+  const matches = await bcrypt.compare(
+    req.body.password,
+    user ? user.password : DUMMY_PASSWORD_HASH,
+  );
+  if (user && !validTokenVersion(user.tokenVersion)) fail(LOGIN_FAILURE_MESSAGE, 401);
+  if (!user || !matches) {
+    if (user) await recordFailedLogin(user);
+    fail(LOGIN_FAILURE_MESSAGE, 401);
   }
+  if (!user.isActive)
+    fail("Your account has been suspended. Please contact an admin.", 403);
+  const authenticatedUser = await completeLogin(user);
+  if (!authenticatedUser) {
+    // Incorrect credentials never reveal whether the supplied account is locked.
+    const lock = await getLoginLock(user);
+    if (lock) {
+      const minutes = Math.ceil(lock.retryAfterSeconds / 60);
+      return res.status(401).json({
+        message: `This account is temporarily locked after repeated failed attempts. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+        retryAfterSeconds: lock.retryAfterSeconds,
+      });
+    }
+    fail(LOGIN_FAILURE_MESSAGE, 401);
+  }
+  const { token, claims } = createSession(authenticatedUser);
+  setSessionCookie(res, token, claims);
+  res.json({ message: "Login successful", user: publicUser(authenticatedUser),
+    ...sessionDetails(claims), ...csrfDetails(req, res, token) });
 };
-
+const logoutUser = async (req, res) => {
+  // A delayed duplicate logout cannot revoke a newer session version.
+  const result = await User.updateOne(
+    { _id: req.user.id, ...tokenVersionFilter(req.user.tokenVersion) },
+    { $inc: { tokenVersion: 1 } },
+  );
+  if (!result.matchedCount) fail(SESSION_ENDED_MESSAGE, 401);
+  clearSessionCookie(res);
+  res.json({ message: "Logged out on all devices." });
+};
+const getProfile = async (req, res) =>
+  res.json({ user: publicUser(await User.findById(req.user.id)),
+    ...sessionDetails(req.auth.claims), ...csrfDetails(req, res, req.auth.token) });
 const updateProfile = async (req, res) => {
-  try {
-    const { username, currentPassword, newPassword } = req.body;
-    const email = req.body.email ? req.body.email.trim().toLowerCase() : "";
-
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (username && username.trim()) {
-      user.username = username.trim();
-    }
-
-    if (email && email !== user.email) {
-      const taken = await User.findOne({ email });
-      if (taken) {
-        return res.status(400).json({ message: "Email is already in use" });
-      }
-      user.email = email;
-    }
-
-    if (currentPassword && newPassword) {
-      if (currentPassword === newPassword) {
-        return res.status(400).json({
-          message: "New password cannot be the same as current password",
-        });
-      }
-
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-      }
-
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-      if (!isMatch) {
-        return res.status(400).json({ message: "Current password is incorrect" });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
-    }
-
-    await user.save();
-
-    res.status(200).json({
-      message: "Profile updated successfully",
-      user: publicUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  fields(req.body, ["username", "email", "currentPassword", "newPassword"]);
+  if (!Object.keys(req.body).length) fail("Choose a profile field to update");
+  const user = await User.findById(req.user.id);
+  if (!user) fail("Account not found", 404);
+  const changes = {};
+  if (req.body.username !== undefined)
+    changes.username = text(req.body.username, "Username", 80);
+  if (req.body.email !== undefined) {
+    const email = validEmail(req.body.email);
+    if (email !== user.email && (await User.exists({ email })))
+      fail("Email is already in use", 409);
+    changes.email = email;
   }
+  if (
+    req.body.currentPassword !== undefined ||
+    req.body.newPassword !== undefined
+  ) {
+    const nextPassword = validPassword(req.body.newPassword);
+    if (
+      typeof req.body.currentPassword !== "string" ||
+      !(await bcrypt.compare(req.body.currentPassword, user.password))
+    )
+      fail("Current password is incorrect");
+    if (req.body.currentPassword === nextPassword)
+      fail("New password must differ from your current password");
+    changes.password = await bcrypt.hash(nextPassword, 10);
+  }
+  const updated = await User.findOneAndUpdate(
+    {
+      _id: user._id,
+      ...tokenVersionFilter(req.user.tokenVersion),
+      ...(changes.password ? { password: user.password } : {}),
+    },
+    {
+      $set: changes,
+      ...(changes.password ? { $inc: { tokenVersion: 1 } } : {}),
+    },
+    { returnDocument: "after", runValidators: true },
+  );
+  if (!updated) fail(SESSION_ENDED_MESSAGE, 401);
+  if (changes.password) clearSessionCookie(res);
+  res.json({ message: "Profile updated", user: publicUser(updated) });
 };
-
-// Users can delete their own account (needs password confirmation)
 const deleteAccount = async (req, res) => {
-  try {
-    const { password } = req.body;
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const isMatch = await bcrypt.compare(password || "", user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Password is incorrect" });
-    }
-
-    await deleteUserAndData(user._id);
-
-    res.status(200).json({ message: "Account deleted" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  fields(req.body, ["password"]);
+  const user = await User.findById(req.user.id);
+  if (!user) fail("Account not found", 404);
+  if (
+    typeof req.body.password !== "string" ||
+    !(await bcrypt.compare(req.body.password, user.password))
+  )
+    fail("Password is incorrect");
+  await deleteUserAndData(user._id);
+  clearSessionCookie(res);
+  res.json({ message: "Account and associated data deleted" });
 };
-
-module.exports = { registerUser, loginUser, updateProfile, deleteAccount };
+module.exports = {
+  registerUser,
+  loginUser,
+  logoutUser,
+  getProfile,
+  updateProfile,
+  deleteAccount,
+};

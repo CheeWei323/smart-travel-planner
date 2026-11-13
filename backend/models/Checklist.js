@@ -9,11 +9,14 @@ const checklistSchema = new mongoose.Schema(
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
+      immutable: true,
       ref: "User",
       required: true,
     },
     task: {
       type: String,
+      trim: true,
+      maxlength: 300,
       required: true,
     },
     isCompleted: {
@@ -21,7 +24,7 @@ const checklistSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Checklist", checklistSchema);

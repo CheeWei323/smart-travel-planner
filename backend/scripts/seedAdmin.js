@@ -1,37 +1,56 @@
-// Usage:  npm run seed:admin
-// Reads ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_USERNAME from .env
-// Creates the admin account, or promotes it if the email already exists.
-require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const {
+  email: validEmail,
+  password: validPassword,
+  text,
+  fail,
+} = require("../utils/validation");
 
-(async () => {
-  const email = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD;
-  const username = process.env.ADMIN_USERNAME || "Admin";
-
-  if (!email || !password) {
-    console.error("Please set ADMIN_EMAIL and ADMIN_PASSWORD in backend/.env");
-    process.exit(1);
-  }
-
-  await mongoose.connect(process.env.MONGO_URI);
-
-  let user = await User.findOne({ email });
-  if (user) {
-    user.role = "admin";
-    user.isActive = true;
-    await user.save();
-    console.log(`Existing user ${email} promoted to admin`);
-  } else {
-    const hashed = await bcrypt.hash(password, await bcrypt.genSalt(10));
-    await User.create({ username, email, password: hashed, role: "admin" });
-    console.log(`Admin account created: ${email}`);
-  }
-
-  await mongoose.disconnect();
-})().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
-});
+const provisionAdmin = async ({ email, password, username = "Admin" }) => {
+  email = validEmail(email);
+  username = text(username, "Username", 80);
+  const existing = await User.findOne({ email });
+  // A pre-registered ordinary account must never silently receive admin access.
+  if (existing && existing.role !== "admin")
+    fail(
+      "This email belongs to an ordinary account. Choose a new administrator email.",
+    );
+  if (existing) return { created: false };
+  password = validPassword(password);
+  await User.create({
+    username,
+    email,
+    password: await bcrypt.hash(password, 10),
+    role: "admin",
+  });
+  return { created: true };
+};
+if (require.main === module) {
+  require("dotenv").config({
+    path: require("path").join(__dirname, "../.env"),
+  });
+  const mongoose = require("mongoose");
+  (async () => {
+    try {
+      if (!process.env.MONGO_URI) fail("Set MONGO_URI in backend/.env");
+      await mongoose.connect(process.env.MONGO_URI);
+      const result = await provisionAdmin({
+        email: process.env.ADMIN_EMAIL,
+        password: process.env.ADMIN_PASSWORD,
+        username: process.env.ADMIN_USERNAME || "Admin",
+      });
+      console.log(
+        result.created
+          ? "Administrator created. You can now log in."
+          : "Administrator already exists; password and status unchanged.",
+      );
+    } catch (error) {
+      console.error(error.message);
+      process.exitCode = 1;
+    } finally {
+      await mongoose.disconnect();
+    }
+  })();
+}
+module.exports = { provisionAdmin };
