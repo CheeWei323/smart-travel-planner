@@ -7,6 +7,7 @@ import {
   FaBullhorn,
   FaComments,
   FaCog,
+  FaShieldAlt,
   FaSignOutAlt,
 } from "react-icons/fa";
 import { useAuth } from "../hooks/useAuth";
@@ -18,6 +19,7 @@ const links = [
   ["/admin/trips", FaSuitcase, "Trip management"],
   ["/admin/announcements", FaBullhorn, "Announcements"],
   ["/admin/feedback", FaComments, "Feedback"],
+  ["/admin/security", FaShieldAlt, "Security logs"],
   ["/admin/settings", FaCog, "Account settings"],
 ];
 export default function AdminLayout() {

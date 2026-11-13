@@ -30,6 +30,10 @@ const pageDetails = {
     "Feedback management",
     "Review feedback, respond to travelers and manage conversation status.",
   ],
+  Security: [
+    "Security logs",
+    "Recent sign-ins, failed logins and admin actions on accounts.",
+  ],
 };
 export default function AdminPage({ section = "Overview" }) {
   const [params] = useSearchParams();
@@ -49,6 +53,7 @@ export default function AdminPage({ section = "Overview" }) {
       {section === "Trips" && <Trips />}
       {section === "Announcements" && <Announcements />}
       {section === "Feedback" && <Feedback />}
+      {section === "Security" && <SecurityLogs />}
     </>
   );
 }
@@ -612,5 +617,74 @@ function FeedbackItem({ item, reload }) {
         </div>
       </form>
     </article>
+  );
+}
+// Security Logs page: three count cards and a table of recent events
+function SecurityLogs() {
+  const { data, loading, error, reload } = useResource(
+    service.getAuditLogs,
+    null,
+  );
+  if (loading) return <Loading>Loading security logs…</Loading>;
+  if (error) return <Retry error={error} reload={reload} />;
+  return (
+    <>
+      <div className="stats-grid">
+        {[
+          ["Logins today", data.counts.loginsToday],
+          ["Failed logins today", data.counts.failedToday],
+          ["New users · 7 days", data.counts.newUsersWeek],
+        ].map(([label, value]) => (
+          <div className="stat-card" key={label}>
+            <p>{label}</p>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+      <section className="panel">
+        <h2>Recent events</h2>
+        {!data.logs.length ? (
+          <p className="muted">No security events recorded yet.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <caption className="sr-only">Recent security events</caption>
+              <thead>
+                <tr>
+                  {[
+                    "Time",
+                    "Action",
+                    "Account",
+                    "IP address",
+                    "Result",
+                    "Details",
+                  ].map((label) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.logs.map((log) => (
+                  <tr key={log._id}>
+                    <td>{new Date(log.time).toLocaleString()}</td>
+                    <td>{log.action}</td>
+                    <td>{log.email || "—"}</td>
+                    <td>{log.ip}</td>
+                    <td>
+                      <span
+                        className={`badge ${log.success ? "active" : "warning"}`}
+                      >
+                        {log.success ? "Success" : "Failed"}
+                      </span>
+                    </td>
+                    <td>{log.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }

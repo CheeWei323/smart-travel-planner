@@ -8,6 +8,7 @@ const {
   tokenVersionFilter,
 } = require("../utils/sessionSecurity");
 const { deleteUserAndData } = require("../utils/deleteUserData");
+const { logEvent } = require("../utils/audit");
 const {
   recordFailedLogin,
   completeLogin,
@@ -41,6 +42,7 @@ const registerUser = async (req, res) => {
     email,
     password: await bcrypt.hash(password, 10),
   });
+  await logEvent(req, "REGISTER", { userId: user._id, email, success: true });
   res
     .status(201)
     .json({
@@ -54,35 +56,60 @@ const loginUser = async (req, res) => {
   if (
     typeof req.body.password !== "string" ||
     Buffer.byteLength(req.body.password, "utf8") > 72
-  )
+  ) {
+    await logEvent(req, "LOGIN_FAILED", {
+      email, success: false, note: "Invalid password input",
+    });
     fail(LOGIN_FAILURE_MESSAGE, 401);
+  }
   const user = await User.findOne({ email }).select("+tokenVersion");
   const matches = await bcrypt.compare(
     req.body.password,
     user ? user.password : DUMMY_PASSWORD_HASH,
   );
-  if (user && !validTokenVersion(user.tokenVersion)) fail(LOGIN_FAILURE_MESSAGE, 401);
-  if (!user || !matches) {
-    if (user) await recordFailedLogin(user);
+  if (user && !validTokenVersion(user.tokenVersion)) {
+    await logEvent(req, "LOGIN_BLOCKED", {
+      userId: user._id, email, success: false, note: "Invalid account session state",
+    });
     fail(LOGIN_FAILURE_MESSAGE, 401);
   }
-  if (!user.isActive)
+  if (!user || !matches) {
+    if (user) await recordFailedLogin(user);
+    await logEvent(req, "LOGIN_FAILED", {
+      userId: user?._id, email, success: false, note: "Wrong email or password",
+    });
+    fail(LOGIN_FAILURE_MESSAGE, 401);
+  }
+  if (!user.isActive) {
+    await logEvent(req, "LOGIN_BLOCKED", {
+      userId: user._id, email, success: false, note: "Account is suspended",
+    });
     fail("Your account has been suspended. Please contact an admin.", 403);
+  }
   const authenticatedUser = await completeLogin(user);
   if (!authenticatedUser) {
     // Incorrect credentials never reveal whether the supplied account is locked.
     const lock = await getLoginLock(user);
     if (lock) {
       const minutes = Math.ceil(lock.retryAfterSeconds / 60);
+      await logEvent(req, "LOGIN_BLOCKED", {
+        userId: user._id, email, success: false, note: "Account is temporarily locked",
+      });
       return res.status(401).json({
         message: `This account is temporarily locked after repeated failed attempts. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
         retryAfterSeconds: lock.retryAfterSeconds,
       });
     }
+    await logEvent(req, "LOGIN_FAILED", {
+      userId: user._id, email, success: false, note: "Account changed during login",
+    });
     fail(LOGIN_FAILURE_MESSAGE, 401);
   }
   const { token, claims } = createSession(authenticatedUser);
   setSessionCookie(res, token, claims);
+  await logEvent(req, "LOGIN_SUCCESS", {
+    userId: authenticatedUser._id, email, success: true,
+  });
   res.json({ message: "Login successful", user: publicUser(authenticatedUser),
     ...sessionDetails(claims), ...csrfDetails(req, res, token) });
 };
