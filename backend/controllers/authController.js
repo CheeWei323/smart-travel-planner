@@ -1,4 +1,6 @@
 const User = require("../models/User");
+const Trip = require("../models/Trip");
+const Feedback = require("../models/Feedback");
 const bcrypt = require("bcryptjs");
 const { createSession, sessionDetails, setSessionCookie, clearSessionCookie,
   csrfDetails } = require("../utils/cookieSession");
@@ -32,15 +34,18 @@ const publicUser = (user) => ({
   role: user.role,
 });
 const registerUser = async (req, res) => {
-  fields(req.body, ["username", "email", "password"]);
+  fields(req.body, ["username", "email", "password", "privacyConsent"]);
   const username = text(req.body.username, "Username", 80);
   const email = validEmail(req.body.email);
   const password = validPassword(req.body.password);
+  if (req.body.privacyConsent !== true)
+    fail("You must agree to the Privacy Policy before registering");
   if (await User.exists({ email })) fail("Email is already registered", 409);
   const user = await User.create({
     username,
     email,
     password: await bcrypt.hash(password, 10),
+    consentAt: new Date(),
   });
   await logEvent(req, "REGISTER", { userId: user._id, email, success: true });
   res
@@ -126,6 +131,31 @@ const logoutUser = async (req, res) => {
 const getProfile = async (req, res) =>
   res.json({ user: publicUser(await User.findById(req.user.id)),
     ...sessionDetails(req.auth.claims), ...csrfDetails(req, res, req.auth.token) });
+const exportUserData = async (req, res) => {
+  const user = await User.findById(req.user.id).select(
+    "username email role consentAt createdAt updatedAt",
+  ).lean();
+  if (!user) fail("Account not found", 404);
+  const [trips, feedback] = await Promise.all([
+    Trip.find({ userId: req.user.id }).sort({ createdAt: -1 }).lean(),
+    Feedback.find({ userId: req.user.id }).sort({ createdAt: -1 }).lean(),
+  ]);
+  res.setHeader("Content-Disposition", 'attachment; filename="my-travelwise-data.json"');
+  res.json({
+    exportedAt: new Date().toISOString(),
+    profile: {
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      consentAt: user.consentAt ?? null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+    trips,
+    feedback,
+  });
+};
 const updateProfile = async (req, res) => {
   fields(req.body, ["username", "email", "currentPassword", "newPassword"]);
   if (!Object.keys(req.body).length) fail("Choose a profile field to update");
@@ -190,4 +220,5 @@ module.exports = {
   getProfile,
   updateProfile,
   deleteAccount,
+  exportUserData,
 };

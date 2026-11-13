@@ -1721,3 +1721,67 @@ td strong {
     display: none;
   }
 }
+
+/* Registration Privacy Policy Consent */
+.consent-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: normal;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.consent-row input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin: 0.25em 0 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+}
+
+.consent-row label {
+  display: block;
+  flex-direction: row;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: 500;
+  white-space: normal;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.password-strength {
+  margin-top: -4px;
+}
+.password-strength-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.strength-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-top: 6px;
+}
+.strength-bar span {
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+}
+.strength-text.strength-0,
+.strength-text.strength-1 { color: #a63a3a; }
+.strength-text.strength-2 { color: #92620e; }
+.strength-text.strength-3,
+.strength-text.strength-4 { color: var(--teal); }
+.strength-bar .strength-0,
+.strength-bar .strength-1 { background: #a63a3a; }
+.strength-bar .strength-2 { background: #ad781c; }
+.strength-bar .strength-3,
+.strength-bar .strength-4 { background: var(--teal); }

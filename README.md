@@ -138,6 +138,8 @@ Use one hostname consistently when accessing the system. Restart the backend aft
 
 Register on the website, then log in. Registration creates a normal traveler account. New passwords require at least **15 characters** and cannot appear on the local common-password blocklist. Spaces are allowed. Inputs exceeding bcrypt's 72-byte limit are rejected.
 
+Registration requires agreement to the Privacy Policy and records the time of consent. API registrations must include `privacyConsent: true` in their JSON body. Existing accounts remain usable without registering again. In account settings, **Download my data** exports the signed-in user's profile, travel plans, itineraries and feedback as JSON.
+
 ### Existing administrator
 
 Log in with an existing administrator account. The website opens `/admin` automatically. Normal registration does not create administrators. An existing administrator can manage account roles through **Users**.
