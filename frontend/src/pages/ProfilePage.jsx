@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import zxcvbn from "zxcvbn";
 
 import { useAuth } from "../hooks/useAuth";
@@ -244,6 +244,24 @@ export default function ProfilePage({ admin = false }) {
               {pending === "profile" ? "Saving…" : "Save profile"}
             </button>
           </form>
+
+          <section className="panel form-stack">
+            <h2>Security & Privacy</h2>
+            <p>
+              Learn how to protect your account and understand how your personal
+              information is handled.
+            </p>
+
+            <div className="profile-actions">
+              <Link to="/security-tips" className="button secondary">
+                View Security Tips
+              </Link>
+
+              <Link to="/privacy-policy" className="button secondary">
+                Read Privacy Policy
+              </Link>
+            </div>
+          </section>
 
           <form className="panel form-stack" onSubmit={password}>
             <h2>Change password</h2>

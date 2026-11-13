@@ -94,7 +94,7 @@ export default function PrivacyPolicyPage() {
         </p>
 
         <p>
-          <Link to="/register">Return to registration</Link>
+          <Link to="/register">Return</Link>
         </p>
       </div>
     </AuthLayout>
